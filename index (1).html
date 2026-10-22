@@ -1,0 +1,1278 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<meta name="theme-color" content="#0a6a86">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Slagboek">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-180.png">
+<title>Slagboek</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Archivo:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" defer></script>
+<style>
+/* Layout: app-shell à la intervals. Desktop: vaste zijbalk + breed werkvlak met 12-koloms raster.
+   Telefoon: kopbalk + tabbalk onderin, alles in één kolom. */
+:root {
+  --bg: #eef2f4; --surface: #ffffff; --surface-2: #f6f9fa; --soft: #e3ebef; --ink: #0f1d26; --muted: #56676f; --faint: #8a9aa2; --line: #d6dfe3; --line-2: #e8eef1;
+  --accent: #0a6a86; --accent-ink: #ffffff; --accent-soft: rgba(10,106,134,.10); --band: rgba(10,106,134,.13);
+  --groen: #1d8049; --geel: #a86a12; --rood: #bb342d; --grijs: #6f8089;
+  --s-Rowing: #2a78d6; --s-VirtualRow: #eb6834; --s-Ride: #1baf7a; --s-WeightTraining: #eda100; --s-Run: #e87ba4; --s-Other: #8a959b;
+  --c-ctl: #2a78d6; --c-atl: #6250d6;
+  --f-display: "Barlow Condensed", "Arial Narrow", system-ui, sans-serif;
+  --f-body: "Archivo", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-data: "JetBrains Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+  --r: 10px; --zij: 232px; color-scheme: light;
+}
+@media (prefers-color-scheme: dark) { :root {
+  --bg: #0b1418; --surface: #121f27; --surface-2: #0f1b22; --soft: #1a2c36; --ink: #e5eef2; --muted: #93a6b0; --faint: #627580; --line: #22343e; --line-2: #1a2a33;
+  --accent: #46b6d3; --accent-ink: #052029; --accent-soft: rgba(70,182,211,.12); --band: rgba(70,182,211,.16);
+  --groen: #4fc283; --geel: #e2a744; --rood: #f06c62; --grijs: #8d9ea7;
+  --s-Rowing: #3987e5; --s-VirtualRow: #d95926; --s-Ride: #199e70; --s-WeightTraining: #c98500; --s-Run: #d55181; --s-Other: #7d8a91;
+  --c-ctl: #3987e5; --c-atl: #9085e9; color-scheme: dark } }
+
+* { box-sizing: border-box }
+html, body { height: 100% }
+html { -webkit-text-size-adjust: 100% }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 14.5px/1.5 var(--f-body) }
+[hidden] { display: none !important }
+button, input, select { font: inherit; color: inherit }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px }
+.mono, .num { font-family: var(--f-data); font-variant-numeric: tabular-nums }
+.muted { color: var(--muted) } .small { font-size: 12.5px }
+h1, h2, h3 { margin: 0 }
+
+/* ---- shell ---- */
+.shell { display: grid; grid-template-columns: var(--zij) minmax(0, 1fr); min-height: 100% }
+aside.zij { position: sticky; top: 0; height: 100vh; display: flex; flex-direction: column; gap: 4px; padding: 18px 12px calc(14px + env(safe-area-inset-bottom, 0px)) max(12px, env(safe-area-inset-left, 0px)); background: var(--surface); border-right: 1px solid var(--line) }
+.merk { display: flex; align-items: center; gap: 10px; padding: 4px 10px 18px }
+.merk svg { width: 30px; height: 30px; flex: none }
+.merk b { font: 700 24px/1 var(--f-display); letter-spacing: .07em; text-transform: uppercase }
+.nav { display: grid; gap: 2px }
+.nav button { display: flex; align-items: center; gap: 12px; width: 100%; padding: 9px 10px; border: 0; border-radius: 8px; background: none; color: var(--muted); font-weight: 600; cursor: pointer; text-align: left }
+.nav button svg { width: 19px; height: 19px; flex: none }
+.nav button:hover { background: var(--surface-2); color: var(--ink) }
+.nav button[aria-current="page"] { background: var(--accent-soft); color: var(--accent) }
+.zij-voet { margin-top: auto; padding: 12px 10px 0; border-top: 1px solid var(--line-2); display: grid; gap: 8px }
+.mini-score { display: flex; align-items: center; gap: 10px }
+.mini-score b { font: 700 28px/1 var(--f-display) }
+.werk { min-width: 0; padding: 24px max(28px, env(safe-area-inset-right, 0px)) 48px 28px }
+.kop { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px 20px; margin-bottom: 20px }
+.kop h1 { font: 700 34px/1 var(--f-display); letter-spacing: .03em; text-transform: uppercase }
+.kop .sub { color: var(--muted); margin-top: 4px }
+.topbalk, .tabbalk { display: none }
+
+/* ---- raster & kaarten ---- */
+.raster { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 16px; align-items: start }
+.s3 { grid-column: span 3 } .s4 { grid-column: span 4 } .s5 { grid-column: span 5 } .s6 { grid-column: span 6 } .s7 { grid-column: span 7 } .s8 { grid-column: span 8 } .s12 { grid-column: span 12 }
+.kaart { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 16px 18px; min-width: 0 }
+.kaart-kop { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 12px; flex-wrap: wrap }
+.kaart-kop h2, .label { font: 700 13px var(--f-display); letter-spacing: .12em; text-transform: uppercase; color: var(--muted) }
+.stack { display: grid; gap: 12px }
+.row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 8px 14px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); cursor: pointer; font-weight: 600; white-space: nowrap }
+.btn:hover { border-color: var(--faint) }
+.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent) }
+.btn.link { border: 0; background: none; padding: 4px 0; color: var(--accent) }
+.btn.klein { padding: 5px 10px; font-size: 13px }
+.btn:disabled { opacity: .5; cursor: default }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--surface) }
+.seg button { border: 0; background: none; padding: 6px 12px; font-weight: 600; font-size: 13px; cursor: pointer; color: var(--muted) }
+.seg button + button { border-left: 1px solid var(--line) }
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink) }
+.melding { padding: 10px 12px; border-radius: 8px; font-size: 14px; margin-bottom: 16px }
+.melding.fout { background: color-mix(in srgb, var(--rood) 13%, var(--surface)); border: 1px solid color-mix(in srgb, var(--rood) 40%, var(--line)) }
+.melding.ok { background: color-mix(in srgb, var(--groen) 13%, var(--surface)); border: 1px solid color-mix(in srgb, var(--groen) 40%, var(--line)) }
+.melding.info { background: var(--soft) }
+.veld { display: grid; gap: 4px; min-width: 0 }
+.veld label, .lbl { font-size: 12.5px; font-weight: 600; color: var(--muted) }
+.veld input, .veld select, select.ctl { width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-2) }
+select.ctl { width: auto; padding: 6px 10px }
+.chip { display: inline-flex; align-items: center; gap: 6px; font: 600 11px var(--f-data); text-transform: uppercase; letter-spacing: .05em; padding: 3px 7px; border-radius: 5px; background: var(--soft); white-space: nowrap }
+.dot { width: 9px; height: 9px; border-radius: 50%; flex: none; background: var(--s-Other) }
+.chip.zone { background: var(--accent); color: var(--accent-ink) }
+.chip.ok { background: color-mix(in srgb, var(--groen) 15%, var(--surface)); color: var(--groen) }
+.pil { font: 600 11px var(--f-data); padding: 2px 6px; border-radius: 4px; text-transform: uppercase; letter-spacing: .04em }
+.pil.groen, .pil.goed { color: var(--groen); background: color-mix(in srgb, var(--groen) 14%, var(--surface)) }
+.pil.geel, .pil.let { color: var(--geel); background: color-mix(in srgb, var(--geel) 14%, var(--surface)) }
+.pil.rood, .pil.slecht { color: var(--rood); background: color-mix(in srgb, var(--rood) 14%, var(--surface)) }
+
+/* ---- overzicht ---- */
+.status { --c: var(--grijs); position: relative; overflow: hidden; background: color-mix(in srgb, var(--c) 9%, var(--surface)); border-color: color-mix(in srgb, var(--c) 35%, var(--line)) }
+.status.groen { --c: var(--groen) } .status.geel { --c: var(--geel) } .status.rood { --c: var(--rood) }
+.status-top { display: flex; align-items: center; gap: 18px }
+.ring { position: relative; width: 104px; height: 104px; flex: none }
+.ring svg { width: 100%; height: 100%; transform: rotate(-90deg) }
+.ring b { position: absolute; inset: 0; display: grid; place-items: center; font: 700 40px/1 var(--f-display); color: var(--c) }
+.status h2.niveau { font: 700 30px/1.02 var(--f-display); text-transform: uppercase; letter-spacing: .03em; color: var(--c); text-wrap: balance }
+.status p { margin: 6px 0 0 }
+.factoren { display: grid; grid-template-columns: 1fr 1fr; gap: 0 18px; margin-top: 14px }
+.factor { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 7px 0; border-top: 1px solid color-mix(in srgb, var(--c) 18%, var(--line)); font-size: 13.5px; min-width: 0 }
+.factor div { min-width: 0 }
+.factor .w { display: block; font: 500 12px var(--f-data); color: var(--muted) }
+.sessie { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 16px; padding: 12px 0; border-top: 1px solid var(--line-2) }
+.sessie:first-of-type { border-top: 0; padding-top: 0 }
+.sessie .info { display: grid; gap: 4px; min-width: 0 }
+.sessie .naam { font-weight: 700; font-size: 15.5px; overflow-wrap: anywhere }
+.sessie .tekst { white-space: pre-wrap; color: var(--muted); font-size: 13.5px; overflow-wrap: anywhere }
+.sessie .hr { text-align: right; align-self: start }
+.sessie .hr b { display: block; font: 700 26px/1 var(--f-display); font-variant-numeric: tabular-nums }
+.sessie .hr span { font: 500 11px var(--f-data); color: var(--muted) }
+.sessie .tip { grid-column: 1 / -1; font-size: 13.5px; padding: 8px 11px; border-radius: 8px; background: var(--surface-2); border: 1px solid var(--line-2) }
+.feit { font: 500 12px var(--f-data); color: var(--muted); display: flex; flex-wrap: wrap; gap: 3px 12px }
+.schaal { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px }
+label.pick { position: relative; display: grid; place-items: center; padding: 6px 0; border: 1px solid var(--line); border-radius: 7px; cursor: pointer; font: 500 13px var(--f-data); background: var(--surface-2) }
+label.pick input { position: absolute; opacity: 0; pointer-events: none }
+label.pick:has(input:checked) { background: var(--accent); color: var(--accent-ink); border-color: var(--accent) }
+label.pick:focus-within { outline: 2px solid var(--accent); outline-offset: 2px }
+.checkin { display: grid; grid-template-columns: 1fr 1fr auto; gap: 12px; align-items: end; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line-2) }
+.tegels { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 16px }
+.tegel { display: grid; gap: 2px; cursor: pointer; text-align: left; font: inherit; color: inherit }
+.tegel:hover { border-color: var(--faint) }
+.tegel .label { font-size: 12px }
+.tegel b { font: 700 30px/1.05 var(--f-display); font-variant-numeric: tabular-nums }
+.tegel b small { font: 500 12px var(--f-data); color: var(--muted); margin-left: 3px }
+.tegel .delta { font: 500 11.5px var(--f-data); color: var(--muted) }
+.tegel .spark { height: 34px; margin-top: 6px }
+.komend { display: grid }
+.komend .dagregel { display: grid; grid-template-columns: 58px minmax(0, 1fr); gap: 10px; padding: 9px 0; border-top: 1px solid var(--line-2); cursor: pointer }
+.komend .dagregel:first-child { border-top: 0; padding-top: 0 }
+.komend .wd { font: 700 15px/1.1 var(--f-display); text-transform: uppercase }
+.komend .wd small { display: block; font: 500 11px var(--f-data); color: var(--muted); text-transform: none }
+.komend .item { display: flex; align-items: center; gap: 8px; font-size: 13.5px; min-width: 0 }
+.komend .item span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+.zones { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px }
+.zone { display: grid; gap: 1px; padding: 8px; border-radius: 8px; background: var(--surface-2); border: 1px solid var(--line-2); min-width: 0 }
+.zone b { font: 700 15px var(--f-display); letter-spacing: .05em }
+.zone span { font: 500 12px var(--f-data) }
+.zone small { font-size: 11px; color: var(--muted) }
+
+/* ---- grafieken ---- */
+.graf { position: relative; min-width: 0 }
+.graf .gkop { display: flex; justify-content: space-between; align-items: baseline; gap: 8px 14px; flex-wrap: wrap; margin-bottom: 4px }
+.graf .gkop b { font-weight: 700 }
+.graf .lees { font: 500 12.5px var(--f-data); color: var(--muted); font-variant-numeric: tabular-nums }
+.graf .lees strong { color: var(--ink); font-weight: 500 }
+.graf .vlak { width: 100%; min-height: 40px }
+.graf svg { display: block; overflow: visible; touch-action: pan-y }
+.graf svg text { font: 500 10.5px var(--f-data); fill: var(--muted) }
+.legenda { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12.5px; color: var(--muted); margin-bottom: 6px }
+.legenda i { display: inline-block; width: 14px; height: 0; border-top: 2.5px solid; vertical-align: middle; margin-right: 6px }
+.legenda i.blok { height: 10px; border: 0; border-radius: 2px; width: 10px }
+.panelen { display: grid; gap: 0 }
+.panelen .graf { padding: 12px 0 10px; border-top: 1px solid var(--line-2) }
+.panelen .graf:first-child { border-top: 0; padding-top: 0 }
+.grafwerk { display: grid; grid-template-columns: 260px minmax(0, 1fr); gap: 16px; align-items: start }
+.kiezer { position: sticky; top: 16px; max-height: calc(100vh - 32px); overflow: auto }
+.kiezer h3 { font: 700 12px var(--f-display); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin: 14px 0 4px }
+.kiezer h3:first-of-type { margin-top: 0 }
+.vink { display: flex; align-items: center; gap: 9px; padding: 4px 6px; border-radius: 6px; cursor: pointer; font-size: 13.5px }
+.vink:hover { background: var(--surface-2) }
+.vink input { accent-color: var(--accent); width: 15px; height: 15px; margin: 0 }
+.vink.leeg { color: var(--faint) }
+.vink .geen { margin-left: auto; font: 500 10.5px var(--f-data); color: var(--faint) }
+
+/* ---- kalender ---- */
+.kal { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)) 150px; border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; background: var(--line) ; gap: 1px }
+.kal .kh { background: var(--surface-2); padding: 8px 10px; font: 700 12px var(--f-display); letter-spacing: .12em; text-transform: uppercase; color: var(--muted) }
+.kal .cel { background: var(--surface); min-height: 128px; padding: 7px 8px 8px; display: flex; flex-direction: column; gap: 5px; min-width: 0 }
+.kal .cel.ander { background: var(--surface-2) }
+.kal .cel.nu { box-shadow: inset 0 0 0 2px var(--accent) }
+.kal .celkop { display: flex; justify-content: space-between; align-items: center; font: 500 12px var(--f-data); color: var(--muted) }
+.kal .cel.nu .celkop { color: var(--accent); font-weight: 700 }
+.kal .wk { background: var(--surface-2); padding: 9px 11px; display: grid; align-content: start; gap: 3px; font: 500 12px var(--f-data); color: var(--muted) }
+.kal .wk b { font: 700 15px var(--f-display); color: var(--ink); letter-spacing: .04em }
+.kal .wk .r { display: flex; justify-content: space-between; gap: 6px }
+.kal .wk .r span:last-child { color: var(--ink) }
+.blok { --s: var(--s-Other); display: grid; gap: 1px; width: 100%; text-align: left; padding: 5px 7px; border-radius: 6px; cursor: pointer; font-size: 12.5px; line-height: 1.3; border: 1px solid color-mix(in srgb, var(--s) 45%, var(--line)); background: color-mix(in srgb, var(--s) 7%, var(--surface)); min-width: 0 }
+.blok.gepland { border-style: dashed; background: var(--surface) }
+.blok.gedaan { background: color-mix(in srgb, var(--s) 16%, var(--surface)); border-style: solid }
+.blok .t { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: flex; align-items: center; gap: 6px }
+.blok .t .dot { background: var(--s); width: 8px; height: 8px }
+.blok .m { font: 500 11px var(--f-data); color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+.blok:hover { border-color: var(--s) }
+
+/* ---- tabel ---- */
+.tabelvak { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--r); background: var(--surface) }
+table { border-collapse: collapse; width: 100%; font-size: 13.5px }
+th, td { text-align: left; padding: 8px 10px; border-top: 1px solid var(--line-2); white-space: nowrap }
+td.wrap { white-space: normal; min-width: 220px }
+th { border-top: 0; font: 600 11px var(--f-data); text-transform: uppercase; letter-spacing: .05em; color: var(--muted); background: var(--surface-2); position: sticky; top: 0 }
+th button { all: unset; cursor: pointer }
+th button:focus-visible { outline: 2px solid var(--accent) }
+td.n, th.n { text-align: right; font-family: var(--f-data); font-variant-numeric: tabular-nums }
+tbody tr { cursor: pointer }
+tbody tr:hover td { background: var(--surface-2) }
+tfoot td { font-weight: 700; background: var(--surface-2); border-top: 1px solid var(--line) }
+td select { padding: 4px 6px; border-radius: 6px; border: 1px solid var(--line); background: var(--surface-2) }
+.filters { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 14px }
+.filters .chipknop { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); cursor: pointer; font-size: 13px; font-weight: 600 }
+.filters .chipknop[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent) }
+.filters input[type=search] { padding: 6px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); min-width: 0; width: 200px }
+
+/* ---- detailpaneel ---- */
+.lade-achter { position: fixed; inset: 0; background: rgba(5,15,20,.35); z-index: 30 }
+.lade { position: fixed; top: 0; right: 0; bottom: 0; width: min(440px, 100vw); background: var(--surface); border-left: 1px solid var(--line); z-index: 31; overflow: auto; padding: 20px max(22px, env(safe-area-inset-right, 0px)) 32px 22px; display: grid; align-content: start; gap: 16px; box-shadow: -12px 0 32px rgba(0,0,0,.12) }
+.lade h2 { font: 700 26px/1.05 var(--f-display); text-transform: uppercase; letter-spacing: .03em; overflow-wrap: anywhere }
+.lade .sluit { position: absolute; top: 14px; right: max(14px, env(safe-area-inset-right, 0px)) }
+.stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1px; background: var(--line-2); border: 1px solid var(--line-2); border-radius: 8px; overflow: hidden }
+.stats div { background: var(--surface); padding: 9px 11px; display: grid }
+.stats span { font-size: 11.5px; color: var(--muted) }
+.stats b { font: 700 20px var(--f-display); font-variant-numeric: tabular-nums }
+
+/* ---- schema ---- */
+.drop { display: grid; gap: 8px; place-items: center; text-align: center; padding: 30px 16px; border: 1.5px dashed var(--line); border-radius: var(--r); background: var(--surface); cursor: pointer }
+.drop.over { border-color: var(--accent); background: var(--accent-soft) }
+.drop strong { font: 700 22px var(--f-display); letter-spacing: .04em; text-transform: uppercase }
+.check { display: flex; gap: 8px; align-items: center; font-size: 14px }
+
+/* ---- slot ---- */
+.slot { max-width: 400px; margin: 14vh auto 0; display: grid; gap: 14px; padding-inline: 16px }
+.slot .merk { padding: 0 }
+.slot .merk b { font-size: 40px }
+
+/* ---- responsief ---- */
+@media (max-width: 1180px) {
+  .tegels { grid-template-columns: repeat(3, minmax(0, 1fr)) }
+  .s5, .s7, .s4, .s8 { grid-column: span 12 }
+  .grafwerk { grid-template-columns: 220px minmax(0, 1fr) }
+}
+@media (max-width: 900px) {
+  .shell { grid-template-columns: minmax(0, 1fr) }
+  aside.zij { display: none }
+  .topbalk { display: flex; position: sticky; top: 0; z-index: 20; align-items: center; justify-content: space-between; gap: 10px; padding: calc(10px + env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) 10px max(16px, env(safe-area-inset-left, 0px)); background: var(--surface); border-bottom: 1px solid var(--line) }
+  .topbalk .merk { padding: 0 } .topbalk .merk b { font-size: 21px } .topbalk .merk svg { width: 26px; height: 26px }
+  .tabbalk { display: grid; grid-template-columns: repeat(5, 1fr); position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; background: var(--surface); border-top: 1px solid var(--line); padding: 4px max(6px, env(safe-area-inset-right, 0px)) calc(4px + env(safe-area-inset-bottom, 0px)) max(6px, env(safe-area-inset-left, 0px)) }
+  .tabbalk button { display: grid; justify-items: center; gap: 2px; padding: 6px 2px; border: 0; background: none; color: var(--muted); font-size: 10.5px; font-weight: 600; cursor: pointer }
+  .tabbalk button svg { width: 21px; height: 21px }
+  .tabbalk button[aria-current="page"] { color: var(--accent) }
+  .werk { padding: 16px max(16px, env(safe-area-inset-right, 0px)) calc(84px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)) }
+  .kop h1 { font-size: 28px }
+  .raster { gap: 12px } .raster > * { grid-column: span 12 }
+  .tegels { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px }
+  .factoren { grid-template-columns: 1fr }
+  .checkin { grid-template-columns: 1fr }
+  .grafwerk { grid-template-columns: minmax(0, 1fr) }
+  .kiezer { position: static; max-height: none }
+  .kal { grid-template-columns: minmax(0, 1fr); background: none; border: 0; gap: 8px }
+  .kal .kh { display: none }
+  .kal .cel { min-height: 0; border: 1px solid var(--line); border-radius: 8px; flex-direction: row; flex-wrap: wrap; align-items: flex-start }
+  .kal .cel .celkop { width: 100%; }
+  .kal .cel.leegdag { display: none }
+  .kal .wk { border-radius: 8px; border: 1px solid var(--line); grid-template-columns: repeat(2, 1fr); gap: 3px 16px; margin-bottom: 14px }
+  .kal .wk b { grid-column: 1 / -1 }
+  .lade { width: 100vw; top: auto; max-height: 88vh; border-left: 0; border-top: 1px solid var(--line); border-radius: 14px 14px 0 0; padding-bottom: calc(28px + env(safe-area-inset-bottom, 0px)) }
+  .stats { grid-template-columns: repeat(2, minmax(0, 1fr)) }
+}
+@media (max-width: 420px) { .zones { grid-template-columns: repeat(3, minmax(0, 1fr)) } .ring { width: 86px; height: 86px } .ring b { font-size: 32px } .status h2.niveau { font-size: 24px } }
+@media (prefers-reduced-motion: no-preference) { .btn, .nav button, .blok, label.pick { transition: background .15s, border-color .15s, color .15s } }
+</style>
+</head>
+<body>
+
+<div id="slot" hidden>
+  <form class="slot" id="ontgrendel">
+    <div class="merk"><svg viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="var(--accent)"/><g stroke="var(--bg)" stroke-width="5" stroke-linecap="round"><line x1="15" y1="49" x2="49" y2="15"/><line x1="49" y1="49" x2="15" y2="15"/></g><g fill="var(--bg)"><circle cx="49" cy="15" r="6"/><circle cx="15" cy="15" r="6"/></g></svg><b>Slagboek</b></div>
+    <p class="muted" style="margin:0">Je data is versleuteld. Vul je sleutel in (SLAGBOEK_SLEUTEL).</p>
+    <div class="veld"><label for="sleutel">Sleutel</label><input id="sleutel" type="password" autocomplete="current-password" required></div>
+    <label class="check"><input type="checkbox" id="onthoud" checked> Onthouden op dit apparaat</label>
+    <div id="slotfout" class="melding fout" hidden></div>
+    <button class="btn primary" type="submit">Openen</button>
+  </form>
+</div>
+
+<div id="app" class="shell" hidden>
+  <aside class="zij">
+    <div class="merk"><svg viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="var(--accent)"/><g stroke="var(--bg)" stroke-width="5" stroke-linecap="round"><line x1="15" y1="49" x2="49" y2="15"/><line x1="49" y1="49" x2="15" y2="15"/></g><g fill="var(--bg)"><circle cx="49" cy="15" r="6"/><circle cx="15" cy="15" r="6"/></g></svg><b>Slagboek</b></div>
+    <nav class="nav" id="nav"></nav>
+    <div class="zij-voet" id="zijvoet"></div>
+  </aside>
+  <div style="min-width:0">
+    <div class="topbalk"><div class="merk"><svg viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="var(--accent)"/><g stroke="var(--bg)" stroke-width="5" stroke-linecap="round"><line x1="15" y1="49" x2="49" y2="15"/><line x1="49" y1="49" x2="15" y2="15"/></g><g fill="var(--bg)"><circle cx="49" cy="15" r="6"/><circle cx="15" cy="15" r="6"/></g></svg><b>Slagboek</b></div><span class="mono small muted" id="topdatum"></span></div>
+    <main class="werk">
+      <div id="globaal" class="melding info" hidden></div>
+      <div id="pagina"></div>
+    </main>
+  </div>
+  <nav class="tabbalk" id="tabbalk"></nav>
+</div>
+<div id="lade-plek"></div>
+
+<script>
+"use strict";
+// ---------- datums & opmaak ----------
+const p2 = n => String(n).padStart(2, "0");
+const iso = d => `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}`;
+const vanIso = s => { const [y, m, d] = s.split("-").map(Number); return new Date(y, m - 1, d); };
+const vandaag = () => iso(new Date());
+const plus = (s, n) => { const d = vanIso(s); d.setDate(d.getDate() + n); return iso(d); };
+const wd = s => (vanIso(s).getDay() + 6) % 7;
+const maandagVan = s => plus(s, -wd(s));
+const dagenTussen = (a, b) => Math.round((vanIso(b) - vanIso(a)) / 864e5);
+const geldig = (y, m, d) => { const dt = new Date(y, m - 1, d); return dt.getFullYear() === y && dt.getMonth() === m - 1 && dt.getDate() === d ? iso(dt) : null; };
+const isoWeek = s => { const d = vanIso(s); d.setDate(d.getDate() + 3 - wd(s)); const j = new Date(d.getFullYear(), 0, 4); return 1 + Math.round(((d - j) / 864e5 - 3 + ((j.getDay() + 6) % 7)) / 7); };
+const DAG_KORT = ["ma", "di", "wo", "do", "vr", "za", "zo"];
+const DAG_LANG = ["maandag", "dinsdag", "woensdag", "donderdag", "vrijdag", "zaterdag", "zondag"];
+const MAAND_KORT = ["jan", "feb", "mrt", "apr", "mei", "jun", "jul", "aug", "sep", "okt", "nov", "dec"];
+const mooi = s => `${DAG_KORT[wd(s)]} ${vanIso(s).getDate()} ${MAAND_KORT[vanIso(s).getMonth()]}`;
+const kort = s => `${vanIso(s).getDate()} ${MAAND_KORT[vanIso(s).getMonth()]}`;
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const uurMin = u => u == null ? "–" : `${Math.floor(u)}u${p2(Math.round((u % 1) * 60))}`;
+const minTekst = m => m == null ? "–" : m >= 60 ? `${Math.floor(m / 60)}u${p2(Math.round(m % 60))}` : `${Math.round(m)}′`;
+const getal = (v, dec = 0) => v == null || isNaN(v) ? "–" : Number(v).toLocaleString("nl-NL", { minimumFractionDigits: dec, maximumFractionDigits: dec });
+const tempo500 = sec => sec == null ? "–" : `${Math.floor(sec / 60)}:${p2(Math.round(sec % 60))}`;
+
+// ---------- schema-lezer (Excel/CSV van de coach) ----------
+const DAGEN = { ma: 0, maa: 0, maandag: 0, mon: 0, monday: 0, di: 1, din: 1, dinsdag: 1, tue: 1, tuesday: 1,
+  wo: 2, woe: 2, woensdag: 2, wed: 2, wednesday: 2, do: 3, don: 3, donderdag: 3, thu: 3, thursday: 3,
+  vr: 4, vrij: 4, vrijdag: 4, fri: 4, friday: 4, za: 5, zat: 5, zaterdag: 5, sat: 5, saturday: 5,
+  zo: 6, zon: 6, zondag: 6, sun: 6, sunday: 6 };
+const MAANDEN = { jan: 1, feb: 2, mrt: 3, maa: 3, mar: 3, apr: 4, mei: 5, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, okt: 10, oct: 10, nov: 11, dec: 12 };
+const LEEG = new Set(["", "-", "--", "nan", "none", "nvt", "x", "rust", "rustdag", "vrij", "off", "rest"]);
+const SPORT_REGELS = [
+  ["VirtualRow", /ergo|\bc2\b|concept ?2|roeimachine|\brp3\b|\bindoor/],
+  ["WeightTraining", /kracht|\bgym\b|squat|deadlift|bench|\bcore\b|clean|\bpress\b|circuit|stabi/],
+  ["Ride", /fiets|\bbike\b|wattbike|\bride\b|wielren|spinning|\bmtb\b|zwift/],
+  ["Run", /hardlo|\blopen\b|\brun\b|\bjog/],
+  ["Rowing", /roei|\bboot\b|skiff|\bwater\b|dubbel|\bacht\b|\bvier\b|\btwee\b|\brow/],
+];
+const SPORT_NL = { Rowing: "Roeien", VirtualRow: "Ergo", Ride: "Fietsen", WeightTraining: "Kracht", Run: "Hardlopen", Other: "Overig" };
+const MOMENTEN = [["ochtend", /ochtend|morning|\bam\b|\bvroeg\b/], ["middag", /middag|afternoon|\blunch\b/], ["avond", /avond|evening|\bpm\b/]];
+const MOMENT_ORDE = { ochtend: 0, middag: 1, avond: 2 };
+
+function kiesJaar(dag, maand) {
+  const nu = vandaag(), j = vanIso(nu).getFullYear();
+  const opties = [j - 1, j, j + 1].map(y => geldig(y, maand, dag)).filter(Boolean);
+  return opties.sort((a, b) => Math.abs(dagenTussen(nu, a)) - Math.abs(dagenTussen(nu, b)))[0] || null;
+}
+function alsDatum(cel) {
+  if (cel == null) return null;
+  if (typeof cel === "number") {
+    if (cel > 40000 && cel < 60000) { const d = new Date(Date.UTC(1899, 11, 30) + Math.floor(cel) * 864e5); return geldig(d.getUTCFullYear(), d.getUTCMonth() + 1, d.getUTCDate()); }
+    return null;
+  }
+  const s = String(cel).trim().toLowerCase();
+  let m = s.match(/(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (m) return geldig(+m[1], +m[2], +m[3]);
+  m = s.match(/\b(\d{1,2})[-/.](\d{1,2})(?:[-/.](\d{2,4}))?\b/);
+  if (m) {
+    if (m[3]) return geldig(+m[3] + (m[3].length === 2 ? 2000 : 0), +m[2], +m[1]);
+    return +m[2] >= 1 && +m[2] <= 12 ? kiesJaar(+m[1], +m[2]) : null;
+  }
+  m = s.match(/\b(\d{1,2})\s*([a-z]{3})[a-z]*\.?(?:\s+(\d{4}))?/);
+  if (m && MAANDEN[m[2]]) return m[3] ? geldig(+m[3], MAANDEN[m[2]], +m[1]) : kiesJaar(+m[1], MAANDEN[m[2]]);
+  return null;
+}
+function weekdag(cel) {
+  if (typeof cel !== "string") return null;
+  const w = cel.toLowerCase().match(/[a-z]+/g);
+  return w && w[0] in DAGEN ? DAGEN[w[0]] : null;
+}
+function weekMaandag(cel) {
+  if (typeof cel !== "string") return null;
+  const m = cel.toLowerCase().match(/\bweek\s*(\d{1,2})\b/);
+  if (!m) return null;
+  const nu = vandaag(), j = vanIso(nu).getFullYear(), w = +m[1];
+  const opties = [j - 1, j, j + 1].map(y => { const jan4 = iso(new Date(y, 0, 4)); const ma = plus(maandagVan(jan4), (w - 1) * 7); return isoWeek(ma) === w ? ma : null; }).filter(Boolean);
+  return opties.sort((a, b) => Math.abs(dagenTussen(nu, a)) - Math.abs(dagenTussen(nu, b)))[0] || null;
+}
+function tekst(cel) {
+  if (cel == null) return "";
+  const s = String(cel).trim();
+  return LEEG.has(s.toLowerCase().replace(/^[ .]+|[ .]+$/g, "")) ? "" : s;
+}
+function herkenSport(t) { t = t.toLowerCase(); for (const [s, r] of SPORT_REGELS) if (r.test(t)) return s; return "Rowing"; }
+function herkenMoment(t) { t = (t || "").toLowerCase(); for (const [m, r] of MOMENTEN) if (r.test(t)) return m; return null; }
+function schatMinuten(tx, sport) {
+  let t = tx.toLowerCase().replace(/[’´]/g, "'").replace(/\b[rp]\s*\d+'(?:\d+"?)?/g, " ");
+  let tot = 0;
+  const uMin = /\b(\d)\s*[uh:]\s*(\d{2})\b/g;
+  for (const m of t.matchAll(uMin)) tot += +m[1] * 60 + +m[2];
+  t = t.replace(uMin, " ");
+  const xMin = /(\d+)\s*[x×]\s*(\d+(?:[.,]\d+)?)\s*(?:'|min\b|minuten)/g;
+  for (const m of t.matchAll(xMin)) tot += +m[1] * parseFloat(m[2].replace(",", "."));
+  t = t.replace(xMin, " ");
+  for (const m of t.matchAll(/(\d+(?:[.,]\d+)?)\s*(?:'|min\b|minuten)/g)) tot += parseFloat(m[1].replace(",", "."));
+  for (const m of t.matchAll(/(\d+(?:[.,]\d+)?)\s*(?:uur|hr|hours?)\b/g)) tot += parseFloat(m[1].replace(",", ".")) * 60;
+  if (!tot) {
+    let meters = 0;
+    for (const m of t.matchAll(/(?:(\d+)\s*[x×]\s*)?(\d+(?:[.,]\d+)?)\s*(km|k|m)\b/g)) {
+      const a = parseFloat(m[2].replace(",", "."));
+      meters += (m[1] ? +m[1] : 1) * (m[3] === "m" ? a : a * 1000);
+    }
+    if (meters) tot = meters / 1000 / ({ Ride: 30, Run: 11 }[sport] || 15) * 60 * 1.4;
+  }
+  return tot ? Math.round(Math.min(Math.max(tot, 10), 300)) : null;
+}
+function maak(datum, tx, label, sportKol) {
+  const sport = sportKol ? herkenSport(sportKol) : herkenSport(tx);
+  const eerste = tx.split("\n")[0].trim();
+  return { datum, tekst: tx, naam: eerste.length <= 60 ? eerste : eerste.slice(0, 57) + "...", sport,
+    moment: herkenMoment(label) || herkenMoment(tx), minuten: schatMinuten(tx, sport) };
+}
+const roosterKoppen = rijen => rijen.map((r, i) => [i, r.filter(c => weekdag(c) != null).length]).filter(x => x[1] >= 3).map(x => x[0]);
+
+function leesRooster(rijen, start) {
+  const koppen = roosterKoppen(rijen), uit = [];
+  koppen.forEach((k, n) => {
+    const eind = koppen[n + 1] ?? rijen.length, kop = rijen[k], kol = {};
+    kop.forEach((c, j) => { const w = weekdag(c); if (w != null) kol[j] = w; });
+    let datums = {}, eerste = k + 1;
+    for (const j in kol) { const d = alsDatum(kop[j]); if (d) datums[j] = d; }
+    if (!Object.keys(datums).length && eerste < eind) {
+      const onder = {};
+      for (const j in kol) { const d = alsDatum(rijen[eerste][j]); if (d) onder[j] = d; }
+      if (Object.keys(onder).length >= 2) { datums = onder; eerste++; }
+    }
+    let maandag = null;
+    const dj = Object.keys(datums)[0];
+    if (dj != null) maandag = plus(datums[dj], -kol[dj]);
+    else {
+      const vorige = n ? koppen[n - 1] + 1 : 0;
+      for (let i = k - 1; i >= vorige && !maandag; i--)
+        for (const c of rijen[i]) { const d = weekMaandag(c) || alsDatum(c); if (d) { maandag = maandagVan(d); break; } }
+    }
+    if (!maandag) {
+      if (!start) throw new Error("Dit rooster heeft geen datums. Vul hieronder de maandag van de eerste week in en lees het bestand opnieuw.");
+      maandag = plus(maandagVan(start), 7 * n);
+    }
+    for (const r of rijen.slice(eerste, eind)) {
+      const label = r.filter((_, j) => !(j in kol)).map(tekst).join(" ");
+      for (const j in kol) {
+        const t = tekst(r[j]);
+        if (!t || (alsDatum(r[j]) && t.length <= 10)) continue;
+        uit.push(maak(datums[j] || plus(maandag, kol[j]), t, label));
+      }
+    }
+  });
+  return uit;
+}
+function leesLijst(rijen) {
+  const past = (c, w) => typeof c === "string" && w.some(x => c.toLowerCase().includes(x));
+  const DK = ["datum", "date"], TK = ["training", "workout", "omschrijving", "sessie", "programma", "inhoud", "beschrijving", "schema", "oefening"],
+    SK = ["sport", "type", "soort"], MK = ["moment", "tijd", "dagdeel", "time"];
+  let kopI = rijen.slice(0, 20).findIndex(r => r.some(c => past(c, DK) || String(c ?? "").trim().toLowerCase() === "dag") &&
+    r.filter(c => typeof c === "string" && c.trim()).length >= 2);
+  let datumJ, sportJ = null, momentJ = null, trainingJs, data;
+  if (kopI >= 0) {
+    const kop = rijen[kopI];
+    datumJ = kop.findIndex(c => past(c, DK));
+    if (datumJ < 0) datumJ = kop.findIndex(c => String(c ?? "").trim().toLowerCase() === "dag");
+    sportJ = kop.findIndex((c, j) => past(c, SK) && j !== datumJ); if (sportJ < 0) sportJ = null;
+    momentJ = kop.findIndex((c, j) => past(c, MK) && j !== datumJ); if (momentJ < 0) momentJ = null;
+    trainingJs = kop.map((c, j) => j).filter(j => past(kop[j], TK) && ![datumJ, sportJ, momentJ].includes(j));
+    if (!trainingJs.length) trainingJs = kop.map((c, j) => j).filter(j => ![datumJ, sportJ, momentJ].includes(j));
+    data = rijen.slice(kopI + 1);
+  } else {
+    const breedte = Math.max(0, ...rijen.map(r => r.length));
+    const tel = Array.from({ length: breedte }, (_, j) => rijen.filter(r => alsDatum(r[j])).length);
+    if (!tel.length || Math.max(...tel) < 2) return [];
+    datumJ = tel.indexOf(Math.max(...tel));
+    trainingJs = tel.map((_, j) => j).filter(j => j !== datumJ);
+    data = rijen;
+  }
+  const uit = []; let laatste = null;
+  for (const r of data) {
+    const cel = j => (j != null && j < r.length ? r[j] : null);
+    const d = alsDatum(cel(datumJ)); if (d) laatste = d;
+    const tx = trainingJs.map(j => tekst(cel(j))).filter(t => t && (weekdag(t) == null || t.length > 10)).join("\n");
+    if (!tx || !laatste) continue;
+    uit.push(maak(laatste, tx, tekst(cel(momentJ)), tekst(cel(sportJ))));
+  }
+  return uit;
+}
+function leesRijen(bladen, start) {
+  let tr = [];
+  for (const rijen of bladen) {
+    if (!rijen.length) continue;
+    tr = tr.concat(roosterKoppen(rijen).length ? leesRooster(rijen, start) : leesLijst(rijen));
+  }
+  tr.sort((a, b) => a.datum.localeCompare(b.datum) || (MOMENT_ORDE[a.moment] ?? 1) - (MOMENT_ORDE[b.moment] ?? 1));
+  const tel = {};
+  for (const t of tr) { tel[t.datum] = (tel[t.datum] || 0) + 1; t.nr = tel[t.datum]; t.id = `coach-${t.datum}-${t.nr}`; }
+  return tr;
+}
+
+
+
+// ---------- versleuteling (gelijk aan bouw.py) ----------
+const tekstBytes = s => new TextEncoder().encode(s);
+const b64 = buf => { let s = ""; const a = new Uint8Array(buf); for (let i = 0; i < a.length; i += 8192) s += String.fromCharCode(...a.subarray(i, i + 8192)); return btoa(s); };
+const unb64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+async function sleutelVan(wachtzin, salt) {
+  const basis = await crypto.subtle.importKey("raw", tekstBytes(wachtzin), "PBKDF2", false, ["deriveKey"]);
+  return crypto.subtle.deriveKey({ name: "PBKDF2", salt, iterations: 200000, hash: "SHA-256" }, basis, { name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]);
+}
+async function ontsleutel(tekst, wachtzin) {
+  const d = JSON.parse(tekst);
+  const platte = await crypto.subtle.decrypt({ name: "AES-GCM", iv: unb64(d.iv) }, await sleutelVan(wachtzin, unb64(d.salt)), unb64(d.ct));
+  return JSON.parse(new TextDecoder().decode(platte));
+}
+async function versleutel(obj, wachtzin) {
+  const salt = crypto.getRandomValues(new Uint8Array(16)), iv = crypto.getRandomValues(new Uint8Array(12));
+  const ct = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, await sleutelVan(wachtzin, salt), tekstBytes(JSON.stringify(obj)));
+  return JSON.stringify({ v: 1, salt: b64(salt), iv: b64(iv), ct: b64(ct) });
+}
+
+// ---------- opslag via GitHub ----------
+const opslag = {
+  lees(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+  zet(k, v) { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch (e) {} },
+};
+function repo() {
+  const eigen = opslag.lees("slagboek-repo");
+  if (eigen) return eigen;
+  const m = location.hostname.match(/^([^.]+)\.github\.io$/);
+  const pad = location.pathname.split("/").filter(Boolean)[0];
+  return m && pad ? `${m[1]}/${pad}` : "";
+}
+async function gh(methode, pad, body) {
+  const token = opslag.lees("slagboek-gh");
+  if (!token) throw new Error("geen-token");
+  const r = await fetch(`https://api.github.com/repos/${repo()}/contents/${pad}`, {
+    method: methode, cache: "no-store",
+    headers: { Authorization: `Bearer ${token}`, Accept: "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28" },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  if (r.status === 404 && methode === "GET") return null;
+  if (r.status === 401 || r.status === 403) throw new Error("token-geweigerd");
+  if (r.status === 409 || r.status === 422) throw new Error("conflict");
+  if (!r.ok) throw new Error("github-" + r.status);
+  return r.json();
+}
+async function leesInvoer(naam, standaard) {
+  const f = await gh("GET", `invoer/${naam}`);
+  if (!f) return { data: standaard, sha: undefined };
+  return { data: await ontsleutel(atob(f.content.replace(/\n/g, "")), S.wachtzin), sha: f.sha };
+}
+async function wijzigInvoer(naam, standaard, wijzig, bericht) {
+  for (let poging = 0; poging < 2; poging++) {
+    const { data, sha } = await leesInvoer(naam, standaard);
+    wijzig(data);
+    try { await gh("PUT", `invoer/${naam}`, { message: bericht, content: btoa(await versleutel(data, S.wachtzin)), sha }); return data; }
+    catch (e) { if (e.message !== "conflict" || poging) throw e; }
+  }
+}
+function foutTekst(e) {
+  if (e.message === "geen-token") return "Om te kunnen opslaan heeft Slagboek een GitHub-token nodig. Vul hem in onder Schema → Instellingen.";
+  if (e.message === "token-geweigerd") return "GitHub weigert de token. Is hij verlopen, of mist hij 'Contents: read and write' voor deze repository?";
+  if (e.name === "OperationError") return "Ontsleutelen lukte niet: je sleutel klopt niet met die van GitHub Actions.";
+  return "Opslaan lukte niet (" + e.message + "). Controleer je verbinding en probeer het opnieuw.";
+}
+
+// ---------- staat ----------
+const PAGINAS = [
+  ["overzicht", "Overzicht", '<path d="M3 3h7v9H3zM14 3h7v5h-7zM14 12h7v9h-7zM3 16h7v5H3z"/>'],
+  ["kalender", "Kalender", '<rect x="3" y="4.5" width="18" height="16.5" rx="2"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4"/>'],
+  ["activiteiten", "Activiteiten", '<path d="M3 12h4l3-8 4 16 3-8h4"/>'],
+  ["grafieken", "Grafieken", '<path d="M3 3v18h18"/><path d="M7 15l4-5 3 3 6-7"/>'],
+  ["schema", "Schema", '<path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M9 14h6M9 17.5h4"/>'],
+];
+const icoon = p => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${p}</svg>`;
+const bewaardeKeuze = (() => { try { return JSON.parse(opslag.lees("slagboek-grafieken") || "null"); } catch (e) { return null; } })();
+const S = {
+  data: null, wachtzin: null, pagina: "overzicht", kalStart: plus(maandagVan(vandaag()), -14),
+  graf: bewaardeKeuze || { metrics: ["score", "hrv", "slaapU", "rhr", "ctl", "load"], periode: 90, per: "dag", sport: "alle" },
+  act: { sport: "alle", zoek: "", sort: "datum", richting: -1, periode: 90 },
+  preview: null, melding: null, bezig: false, wachtOp: null, start: null, verleden: false, fout: null, lade: null,
+};
+{ const p = opslag.lees("slagboek-pagina"); if (PAGINAS.some(x => x[0] === p)) S.pagina = p; }
+if (PAGINAS.some(x => x[0] === location.hash.slice(1))) S.pagina = location.hash.slice(1);
+
+async function laadData() {
+  const r = await fetch(`data.enc?t=${Date.now()}`, { cache: "no-store" });
+  if (r.status === 404) throw new Error("nog-geen-data");
+  if (!r.ok) throw new Error("laden-" + r.status);
+  return ontsleutel(await r.text(), S.wachtzin);
+}
+async function open(wachtzin, onthoud) {
+  S.wachtzin = wachtzin;
+  S.data = await laadData();
+  if (onthoud) opslag.zet("slagboek-sleutel", wachtzin);
+  document.getElementById("slot").hidden = true;
+  document.getElementById("app").hidden = false;
+  render();
+}
+document.getElementById("ontgrendel").addEventListener("submit", async e => {
+  e.preventDefault();
+  const fout = document.getElementById("slotfout");
+  fout.hidden = true;
+  try { await open(document.getElementById("sleutel").value.trim(), document.getElementById("onthoud").checked); }
+  catch (err) {
+    fout.hidden = false;
+    fout.textContent = err.message === "nog-geen-data" ? "Er is nog geen data. Draai de workflow 'slagboek' één keer in GitHub (Actions → Run workflow)."
+      : err.name === "OperationError" ? "Deze sleutel klopt niet. Het is dezelfde als het secret SLAGBOEK_SLEUTEL in GitHub."
+      : "Laden lukte niet. Controleer je verbinding.";
+  }
+});
+async function wachtOpNieuweData() {
+  const oud = S.data.gegenereerd;
+  S.wachtOp = Date.now(); render();
+  while (Date.now() - S.wachtOp < 6 * 60e3) {
+    await new Promise(r => setTimeout(r, 25e3));
+    try { const d = await laadData(); if (d.gegenereerd !== oud) { S.data = d; break; } } catch (e) {}
+  }
+  S.wachtOp = null; render();
+}
+
+// =====================================================================
+// Metrics: alles wat je kunt aanvinken in Grafieken
+// =====================================================================
+const SPORTEN = ["Rowing", "VirtualRow", "Ride", "WeightTraining", "Run", "Other"];
+const sportKleur = s => `var(--s-${SPORTEN.includes(s) ? s : "Other"})`;
+const sportNaam = s => SPORT_NL[s] || s;
+const tempoVan = a => a.km && a.min ? a.min * 60 / (a.km * 2) : null; // seconden per 500 m
+
+const METRICS = [
+  { k: "score", n: "Dagscore", g: "Herstel", max: 100 },
+  { k: "hrv", n: "HRV", e: "ms", g: "Herstel", band: true },
+  { k: "hrvSDNN", n: "HRV (SDNN)", e: "ms", g: "Herstel" },
+  { k: "rhr", n: "Rusthartslag", e: "bpm", g: "Herstel" },
+  { k: "garminReadiness", n: "Readiness", g: "Herstel" },
+  { k: "spO2", n: "SpO₂", e: "%", g: "Herstel" },
+  { k: "ademhaling", n: "Ademhaling", e: "/min", g: "Herstel", dec: 1 },
+  { k: "stress", n: "Stress", g: "Herstel" },
+  { k: "slaapU", n: "Slaap", e: "u", g: "Slaap", t: "staaf", fmt: uurMin },
+  { k: "slaapScore", n: "Slaapscore", g: "Slaap" },
+  { k: "slaapKwaliteit", n: "Slaapkwaliteit", g: "Slaap" },
+  { k: "slaapHR", n: "Hartslag in slaap", e: "bpm", g: "Slaap" },
+  { k: "ctl", n: "Fitness (CTL)", g: "Belasting", dec: 1 },
+  { k: "atl", n: "Vermoeidheid (ATL)", g: "Belasting", dec: 1 },
+  { k: "vorm", n: "Vorm (TSB)", g: "Belasting", dec: 1, nul: true },
+  { k: "load", n: "Trainingsload", g: "Belasting", t: "staaf", agg: "som" },
+  { k: "acuut", n: "Load laatste 7 dagen", g: "Belasting" },
+  { k: "ratio", n: "Belasting t.o.v. gewend", e: "×", g: "Belasting", dec: 2 },
+  { k: "ramp", n: "Ramp rate", g: "Belasting", dec: 1, nul: true },
+  { k: "minuten", n: "Trainingstijd", g: "Training", t: "staaf", agg: "som", fmt: minTekst },
+  { k: "km", n: "Afstand", e: "km", g: "Training", t: "staaf", agg: "som", dec: 1 },
+  { k: "a:tempo", n: "Tempo", e: "/500m", g: "Training", act: a => tempoVan(a), fmt: tempo500, uitleg: "lager is sneller" },
+  { k: "a:hr", n: "Gem. hartslag training", e: "bpm", g: "Training", act: a => a.hr },
+  { k: "a:hrMax", n: "Max hartslag training", e: "bpm", g: "Training", act: a => a.hrMax },
+  { k: "a:cadans", n: "Slagfrequentie / cadans", e: "spm", g: "Training", act: a => a.cadans },
+  { k: "a:watt", n: "Vermogen", e: "W", g: "Training", act: a => a.watt },
+  { k: "a:ef", n: "Efficiëntie (EF)", g: "Training", act: a => a.ef, dec: 2 },
+  { k: "a:decoupling", n: "Decoupling", e: "%", g: "Training", act: a => a.decoupling, dec: 1, nul: true },
+  { k: "a:intensiteit", n: "Intensiteit", e: "%", g: "Training", act: a => a.intensiteit },
+  { k: "gewicht", n: "Gewicht", e: "kg", g: "Lichaam", dec: 1 },
+  { k: "vet", n: "Vetpercentage", e: "%", g: "Lichaam", dec: 1 },
+  { k: "stappen", n: "Stappen", g: "Lichaam", t: "staaf", agg: "som" },
+  { k: "kcal", n: "Calorieën gegeten", e: "kcal", g: "Lichaam" },
+  { k: "gevoel", n: "Gevoel (check-in)", g: "Gevoel" },
+  { k: "spierpijn", n: "Spierpijn (check-in)", g: "Gevoel" },
+  { k: "vermoeid", n: "Vermoeidheid (intervals)", g: "Gevoel" },
+  { k: "pijn", n: "Spierpijn (intervals)", g: "Gevoel" },
+  { k: "stemming", n: "Stemming", g: "Gevoel" },
+  { k: "motivatie", n: "Motivatie", g: "Gevoel" },
+];
+const METRIC = Object.fromEntries(METRICS.map(m => [m.k, m]));
+const PRESETS = {
+  Herstel: ["score", "hrv", "rhr", "slaapU", "slaapScore"],
+  Belasting: ["ctl", "atl", "vorm", "load", "ratio"],
+  Ergo: ["a:tempo", "a:watt", "a:hr", "a:cadans"],
+  Lichaam: ["gewicht", "stappen", "slaapU"],
+};
+const fmtMetric = (m, v) => v == null ? "–" : m.fmt ? m.fmt(v) : getal(v, m.dec || 0) + (m.e && m.e !== "u" ? (m.e.startsWith("/") || m.e === "×" ? "" : " ") + m.e : "");
+
+// Reeks voor een metric over de gekozen periode, per dag of per week.
+function reeksVoor(m, rijen, per, sport) {
+  let dag;
+  if (m.act) {
+    const perDag = {};
+    for (const a of S.data.activiteiten || []) {
+      if (sport !== "alle" && a.sport !== sport) continue;
+      const v = m.act(a); if (v == null) continue;
+      (perDag[a.datum] ||= []).push([v, a.min || 1]);
+    }
+    dag = rijen.map(r => { const l = perDag[r.d]; return l ? l.reduce((s, [v, w]) => s + v * w, 0) / l.reduce((s, [, w]) => s + w, 0) : null; });
+  } else dag = rijen.map(r => r[m.k] ?? null);
+  if (per !== "week") return dag;
+  const groepen = weekGroepen(rijen);
+  return groepen.map(g => {
+    const w = g.idx.map(i => dag[i]).filter(v => v != null);
+    if (!w.length) return null;
+    return m.agg === "som" ? w.reduce((a, b) => a + b, 0) : w.reduce((a, b) => a + b, 0) / w.length;
+  });
+}
+function weekGroepen(rijen) {
+  const g = [];
+  rijen.forEach((r, i) => { const ma = maandagVan(r.d); if (!g.length || g[g.length - 1].ma !== ma) g.push({ ma, idx: [] }); g[g.length - 1].idx.push(i); });
+  return g;
+}
+
+// =====================================================================
+// Grafiek-motor: tekent op de echte breedte, hover is gesynchroniseerd per groep
+// =====================================================================
+const GRAF = new Map();
+let grafTeller = 0;
+function nette(min, max, n = 4) {
+  if (min === max) { min -= 1; max += 1; }
+  const ruw = (max - min) / n, mag = 10 ** Math.floor(Math.log10(ruw));
+  const stap = [1, 2, 2.5, 5, 10].map(x => x * mag).find(x => x >= ruw);
+  const lo = Math.floor(min / stap) * stap, hi = Math.ceil(max / stap) * stap, ticks = [];
+  for (let v = lo; v <= hi + stap / 2; v += stap) ticks.push(+v.toFixed(6));
+  return { lo, hi, ticks };
+}
+// cfg: { labels, reeksen:[{naam,waarden,kleur,type,stippel}], band, hoogte, fmtAs, groep, nul, stapel, spark, lees(i), leesStandaard }
+function graf(cfg) {
+  const id = "g" + (++grafTeller);
+  GRAF.set(id, cfg);
+  return `<div class="vlak" data-g="${id}" style="height:${cfg.hoogte || 150}px"></div>`;
+}
+function tekenAlle() {
+  document.querySelectorAll("[data-g]").forEach(el => {
+    const cfg = GRAF.get(el.dataset.g); if (!cfg) return;
+    el.innerHTML = teken(cfg, el.clientWidth || 300);
+  });
+}
+function teken(cfg, W) {
+  const H = cfg.hoogte || 150, spark = !!cfg.spark;
+  const L = spark ? 2 : 40, R = spark ? 4 : 8, T = spark ? 4 : 8, B = spark ? 2 : 20;
+  const pw = Math.max(10, W - L - R), ph = H - T - B, n = cfg.labels.length;
+  let waarden = [];
+  if (cfg.stapel) cfg.labels.forEach((_, i) => waarden.push(cfg.reeksen.reduce((s, r) => s + (r.waarden[i] || 0), 0)));
+  else waarden = cfg.reeksen.flatMap(r => r.waarden);
+  if (cfg.band) waarden = waarden.concat(cfg.band.lo, cfg.band.hi);
+  waarden = waarden.filter(v => v != null && isFinite(v));
+  if (!waarden.length) return `<div class="small muted" style="padding:${spark ? 0 : 20}px 0">${spark ? "" : "Geen data in deze periode."}</div>`;
+  let mn = Math.min(...waarden), mx = Math.max(...waarden);
+  const heeftStaaf = cfg.stapel || cfg.reeksen.some(r => r.type === "staaf");
+  if (heeftStaaf || cfg.vanaf0) mn = Math.min(0, mn);
+  else { const marge = (mx - mn) * .1 || Math.abs(mx) * .05 || 1; mn -= marge; mx += marge; }
+  if (cfg.nul) { mn = Math.min(mn, 0); mx = Math.max(mx, 0); }
+  let { lo, hi, ticks } = nette(mn, mx, spark ? 2 : 4);
+  if (cfg.max != null && hi > cfg.max && mx <= cfg.max) { hi = cfg.max; ticks = ticks.filter(t => t <= hi); }
+  const stapX = pw / n;
+  const x = i => L + (i + .5) * stapX, y = v => T + ph - (v - lo) / (hi - lo) * ph;
+  let s = "";
+  if (!spark) {
+    s += ticks.map(t => `<line x1="${L}" x2="${L + pw}" y1="${y(t)}" y2="${y(t)}" stroke="var(--line-2)"/><text x="${L - 6}" y="${y(t) + 3.5}" text-anchor="end">${esc((cfg.fmtAs || (v => getal(v, Math.abs(hi - lo) < 5 ? 1 : 0)))(t))}</text>`).join("");
+    const aantal = Math.max(2, Math.floor(pw / 78)), elke = Math.max(1, Math.ceil(n / aantal));
+    for (let i = 0; i < n; i += elke) s += `<text x="${x(i)}" y="${H - 5}" text-anchor="middle">${esc(cfg.xlabel ? cfg.xlabel(cfg.labels[i]) : kort(cfg.labels[i]))}</text>`;
+  }
+  if (cfg.nul && lo < 0 && hi > 0) s += `<line x1="${L}" x2="${L + pw}" y1="${y(0)}" y2="${y(0)}" stroke="var(--faint)" stroke-dasharray="3 3"/>`;
+  if (cfg.band) {
+    const seg = cfg.labels.map((_, i) => i).filter(i => cfg.band.lo[i] != null && cfg.band.hi[i] != null);
+    if (seg.length > 1) s += `<path d="${seg.map((i, k) => `${k ? "L" : "M"}${x(i)},${y(cfg.band.hi[i])}`).join("")}${seg.slice().reverse().map(i => `L${x(i)},${y(cfg.band.lo[i])}`).join("")}Z" fill="var(--band)"/>`;
+  }
+  const bw = Math.max(1, Math.min(18, stapX * .72));
+  if (cfg.stapel) {
+    cfg.labels.forEach((_, i) => {
+      let basis = 0;
+      cfg.reeksen.forEach(r => {
+        const v = r.waarden[i]; if (!v) return;
+        const y0 = y(basis), y1 = y(basis + v);
+        s += `<rect x="${x(i) - bw / 2}" y="${y1}" width="${bw}" height="${Math.max(0, y0 - y1 - (basis ? 1.5 : 0))}" rx="1.5" fill="${r.kleur}"/>`;
+        basis += v;
+      });
+    });
+  }
+  for (const r of cfg.stapel ? [] : cfg.reeksen) {
+    if (r.type === "staaf") {
+      const nulY = y(Math.max(lo, 0));
+      s += r.waarden.map((v, i) => v == null || v === 0 ? "" : `<rect x="${x(i) - bw / 2}" y="${Math.min(y(v), nulY)}" width="${bw}" height="${Math.max(1, Math.abs(nulY - y(v)))}" rx="${Math.min(2, bw / 2)}" fill="${r.kleur}"/>`).join("");
+    } else {
+      let d = "", pen = false;
+      r.waarden.forEach((v, i) => { if (v == null) { pen = cfg.verbind ? pen : false; return; } d += `${pen ? "L" : "M"}${x(i).toFixed(1)},${y(v).toFixed(1)}`; pen = true; });
+      s += `<path d="${d}" fill="none" stroke="${r.kleur}" stroke-width="${spark ? 1.8 : 2}" stroke-linejoin="round" stroke-linecap="round"${r.stippel ? ' stroke-dasharray="5 4"' : ""}/>`;
+      const l = r.waarden.map((v, i) => [v, i]).filter(([v]) => v != null).pop();
+      if (l && !r.stippel) s += `<circle cx="${x(l[1])}" cy="${y(l[0])}" r="${spark ? 2.8 : 3.8}" fill="${r.kleur}" stroke="var(--surface)" stroke-width="2"/>`;
+    }
+  }
+  if (!spark) {
+    s += `<line class="kruis" x1="0" x2="0" y1="${T}" y2="${T + ph}" stroke="var(--muted)" stroke-width="1" visibility="hidden"/>`;
+    s += `<rect class="vang" x="${L}" y="0" width="${pw}" height="${H}" fill="transparent" data-l="${L}" data-pw="${pw}" data-n="${n}"/>`;
+  }
+  return `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(cfg.titel || "grafiek")}">${s}</svg>`;
+}
+function hoverIndex(e) {
+  const r = e.target.closest && e.target.closest("rect.vang"); if (!r) return null;
+  const box = r.ownerSVGElement.getBoundingClientRect();
+  const L = +r.dataset.l, pw = +r.dataset.pw, n = +r.dataset.n;
+  return { el: r.ownerSVGElement.parentElement, i: Math.max(0, Math.min(n - 1, Math.floor((e.clientX - box.left - L) / (pw / n)))) };
+}
+function zetHover(groep, i) {
+  document.querySelectorAll("[data-g]").forEach(el => {
+    const cfg = GRAF.get(el.dataset.g); if (!cfg || !cfg.groep || cfg.groep !== groep) return;
+    const kruis = el.querySelector(".kruis"), vang = el.querySelector(".vang");
+    const lees = el.closest(".graf")?.querySelector(".lees");
+    if (i == null) { kruis?.setAttribute("visibility", "hidden"); if (lees && cfg.leesStandaard != null) lees.innerHTML = cfg.leesStandaard; return; }
+    if (!vang) return;
+    const L = +vang.dataset.l, pw = +vang.dataset.pw, n = +vang.dataset.n, xx = L + (Math.min(i, n - 1) + .5) * pw / n;
+    kruis.setAttribute("x1", xx); kruis.setAttribute("x2", xx); kruis.setAttribute("visibility", "visible");
+    if (lees && cfg.lees) lees.innerHTML = cfg.lees(Math.min(i, n - 1));
+  });
+}
+let hoverGroep = null;
+document.addEventListener("pointermove", e => {
+  const h = hoverIndex(e);
+  if (!h) { if (hoverGroep) { zetHover(hoverGroep, null); hoverGroep = null; } return; }
+  const cfg = GRAF.get(h.el.dataset.g); if (!cfg || !cfg.groep) return;
+  if (hoverGroep && hoverGroep !== cfg.groep) zetHover(hoverGroep, null);
+  hoverGroep = cfg.groep; zetHover(cfg.groep, h.i);
+});
+let herteken; window.addEventListener("resize", () => { clearTimeout(herteken); herteken = setTimeout(tekenAlle, 120); });
+
+// Een paneel met kop + live waarde + grafiek.
+function paneel({ titel, sub, labels, reeksen, band, hoogte, groep, nul, fmt, per, stapel, legenda, max }) {
+  const fmtW = fmt || (v => getal(v));
+  const datumLabel = i => per === "week" ? `wk ${isoWeek(labels[i])}` : mooi(labels[i]);
+  const lees = i => `${esc(datumLabel(i))} · ${reeksen.map(r => `${reeksen.length > 1 ? esc(r.naam) + " " : ""}<strong>${esc(r.waarden[i] == null ? "–" : (r.fmt || fmtW)(r.waarden[i]))}</strong>`).join(" · ")}${band && band.lo[i] != null ? ` · normaal ${esc(fmtW(band.lo[i]))}–${esc(fmtW(band.hi[i]))}` : ""}`;
+  const geldige = reeksen[0].waarden.filter(v => v != null);
+  const standaard = geldige.length ? (stapel ? "" : `laatste <strong>${esc((reeksen[0].fmt || fmtW)(geldige[geldige.length - 1]))}</strong> · gem ${esc(fmtW(geldige.reduce((a, b) => a + b, 0) / geldige.length))}`) : "";
+  const leg = legenda ? `<div class="legenda">${legenda}</div>` : "";
+  return `<div class="graf"><div class="gkop"><b>${esc(titel)}${sub ? ` <span class="muted small" style="font-weight:500">${esc(sub)}</span>` : ""}</b><span class="lees">${standaard}</span></div>${leg}
+    ${graf({ titel, labels, reeksen, band, hoogte, groep, nul, stapel, max, fmtAs: fmt && !fmt.as ? fmt : undefined, xlabel: per === "week" ? (d => "wk " + isoWeek(d)) : null, lees, leesStandaard: standaard })}</div>`;
+}
+
+// =====================================================================
+// Hulpjes voor data
+// =====================================================================
+const trainingenOp = dag => Object.entries(S.data.trainingen || {}).filter(([, t]) => t.datum === dag)
+  .sort((a, b) => (MOMENT_ORDE[a[1].moment] ?? 1) - (MOMENT_ORDE[b[1].moment] ?? 1) || (a[1].nr || 0) - (b[1].nr || 0));
+const extraOp = dag => (S.data.extra || []).filter(a => a.datum === dag);
+const rij = dag => (S.data.dagen || []).find(r => r.d === dag) || {};
+const niveauVan = s => s == null ? "" : s >= 75 ? "groen" : s >= 55 ? "geel" : "rood";
+const IMPACT = f => f.impact === 0 ? ["goed", "goed"] : f.impact >= -8 ? ["let", "let op"] : ["slecht", "slecht"];
+function laatsteWaarde(k) { const d = S.data.dagen; for (let i = d.length - 1; i >= 0; i--) if (d[i][k] != null) return [d[i][k], i]; return [null, -1]; }
+
+// =====================================================================
+// Pagina's
+// =====================================================================
+function paginaOverzicht() {
+  const D = S.data, dag = D.vandaag, a = D.advies, ci = (D.checkins || {})[dag] || {};
+  const sessies = trainingenOp(dag), extra = extraOp(dag);
+  const r = rij(dag);
+  // Status
+  const ring = sc => { const omtrek = 2 * Math.PI * 44; return `<div class="ring"><svg viewBox="0 0 104 104"><circle cx="52" cy="52" r="44" fill="none" stroke="var(--line)" stroke-width="9"/><circle cx="52" cy="52" r="44" fill="none" stroke="var(--c)" stroke-width="9" stroke-linecap="round" stroke-dasharray="${omtrek * sc / 100} ${omtrek}"/></svg><b>${sc}</b></div>`; };
+  const status = a ? `<section class="kaart status ${a.niveau} s5">
+      <div class="status-top">${ring(a.score)}<div><div class="label">Dagscore${a.garminReadiness ? ` · readiness ${a.garminReadiness}` : ""}</div><h2 class="niveau">${esc(a.kop)}</h2><p>${esc(a.uitleg)}</p></div></div>
+      <div class="factoren">${a.factoren.map(f => { const [k, t] = IMPACT(f); return `<div class="factor"><div>${esc(f.naam)}<span class="w">${esc(f.waarde)}</span></div><span class="pil ${k}">${t}</span></div>`; }).join("")}</div>
+    </section>` : `<section class="kaart status s5"><div class="label">Dagscore</div><h2 class="niveau">Nog geen data van vannacht</h2><p>Open de Garmin Connect-app zodat je horloge synct; intervals.icu krijgt het dan vanzelf. Slagboek haalt elk uur nieuwe data op.</p></section>`;
+  // Vandaag
+  const sessieHtml = (t, id) => {
+    const adv = t.advies || {}, g = t.gedaan;
+    return `<div class="sessie"><div class="info">
+        <div class="row" style="gap:6px"><span class="chip"><span class="dot" style="background:${sportKleur(t.sport)}"></span>${esc(sportNaam(t.sport))}</span>${adv.zone ? `<span class="chip zone">${esc(adv.zone)}</span>` : ""}${t.moment ? `<span class="small muted">${esc(t.moment)}</span>` : ""}${g ? `<span class="chip ok">gedaan</span>` : ""}</div>
+        <button class="btn link naam" style="justify-content:flex-start;text-align:left;color:var(--ink)" data-lade="training" data-id="${esc(id)}">${esc(t.naam)}</button>
+        ${t.tekst && t.tekst.trim() !== t.naam ? `<div class="tekst">${esc(t.tekst)}</div>` : ""}
+        ${g ? `<div class="feit">${[g.tijd, minTekst(g.min), g.km && getal(g.km, 1) + " km", g.hr && "gem " + Math.round(g.hr) + " bpm", g.load && "load " + g.load].filter(Boolean).map(x => `<span>${esc(x)}</span>`).join("")}</div>` : ""}
+      </div>
+      ${adv.hr ? `<div class="hr"><b>${adv.hr[0]}–${adv.hr[1]}</b><span>bpm · ${esc(adv.zone)}</span></div>` : t.minuten ? `<div class="hr"><b>~${t.minuten}′</b><span>gepland</span></div>` : "<div></div>"}
+      ${adv.tip ? `<div class="tip">${esc(adv.tip)}</div>` : ""}</div>`;
+  };
+  const schaal = (naam, waarde, links, rechts, titel) => `<div class="veld"><span class="lbl" id="l-${naam}">${titel} <span class="muted" style="font-weight:400">(${links} → ${rechts})</span></span>
+    <div class="schaal" role="radiogroup" aria-labelledby="l-${naam}">${[1, 2, 3, 4, 5].map(n => `<label class="pick"><input type="radio" name="${naam}" id="${naam}-${n}" value="${n}"${waarde === n ? " checked" : ""}>${n}</label>`).join("")}</div></div>`;
+  const vandaagKaart = `<section class="kaart s7"><div class="kaart-kop"><h2>Vandaag · ${esc(DAG_LANG[wd(dag)])} ${esc(kort(dag))}</h2><button class="btn link small" data-pagina="kalender">Kalender →</button></div>
+      ${sessies.length || extra.length ? sessies.map(([id, t]) => sessieHtml(t, id)).join("") + extra.map(x => `<div class="sessie"><div class="info"><div class="row" style="gap:6px"><span class="chip"><span class="dot" style="background:${sportKleur(x.sport)}"></span>${esc(sportNaam(x.sport))}</span><span class="small muted">niet in schema</span></div><button class="btn link naam" style="justify-content:flex-start;color:var(--ink)" data-lade="act" data-id="${esc(x.id)}">${esc(x.naam || "Activiteit")}</button><div class="feit"><span>${esc(x.tijd || "")}</span><span>${minTekst(x.min)}</span>${x.km ? `<span>${getal(x.km, 1)} km</span>` : ""}<span>load ${x.load}</span></div></div><div></div></div>`).join("")
+        : Object.keys(D.trainingen || {}).length ? `<p class="muted" style="margin:0">Geen training gepland. Herstel goed.</p>`
+        : `<div class="stack"><span>Nog geen schema. Zet het Excel-bestand van je coach erin.</span><div><button class="btn primary" data-pagina="schema">Schema toevoegen</button></div></div>`}
+      <form class="checkin" id="checkin">${schaal("gevoel", ci.gevoel, "slecht", "top", "Gevoel")}${schaal("spierpijn", ci.spierpijn, "geen", "veel", "Spierpijn")}
+        <button class="btn${ci.gevoel ? "" : " primary"}" type="submit"${S.bezig ? " disabled" : ""}>${ci.gevoel ? "Bijwerken" : "Check-in"}</button></form>
+    </section>`;
+  // Tegels
+  const tegel = (k, titel, eenheid, fmt, uitleg) => {
+    const [v, i] = laatsteWaarde(k);
+    const reeks = D.dagen.slice(-42).map(x => x[k] ?? null);
+    const week = i >= 7 ? D.dagen[i - 7][k] : null;
+    const delta = v != null && week != null ? v - week : null;
+    return `<button class="kaart tegel" data-metric="${k}"><span class="label">${esc(titel)}</span><b>${v == null ? "–" : esc(fmt(v))}<small>${esc(eenheid)}</small></b>
+      <span class="delta">${uitleg || (delta == null ? "&nbsp;" : (Math.abs(delta) < (k === "slaapU" ? 0.1 : 0.5) ? "gelijk aan vorige week" : `${delta > 0 ? "+" : "−"}${esc(fmt(Math.abs(delta)))} t.o.v. vorige week`))}</span>
+      <div class="spark">${graf({ spark: true, hoogte: 34, labels: D.dagen.slice(-42).map(x => x.d), reeksen: [{ waarden: reeks, kleur: "var(--accent)" }], verbind: true, band: k === "hrv" ? { lo: D.dagen.slice(-42).map(x => x.hrvLaag ?? null), hi: D.dagen.slice(-42).map(x => x.hrvHoog ?? null) } : null, nul: k === "vorm" })}</div></button>`;
+  };
+  const [hrvNu] = laatsteWaarde("hrv"), hrvR = rij(dag);
+  const hrvUitleg = hrvNu && hrvR.hrvLaag ? (hrvNu < hrvR.hrvLaag ? "onder je normale bereik" : hrvNu > hrvR.hrvHoog ? "boven je normale bereik" : "binnen je normale bereik") : null;
+  const tegels = `<div class="tegels s12">
+      ${tegel("ctl", "Fitness", "CTL", v => getal(v))}${tegel("atl", "Vermoeidheid", "ATL", v => getal(v))}${tegel("vorm", "Vorm", "TSB", v => getal(v))}
+      ${tegel("hrv", "HRV", "ms", v => getal(v), hrvUitleg)}${tegel("slaapU", "Slaap", "", uurMin)}${tegel("rhr", "Rusthartslag", "bpm", v => getal(v))}</div>`;
+  // Fitness
+  const f90 = D.dagen.slice(-90), lab = f90.map(x => x.d);
+  const fitness = `<section class="kaart s8"><div class="kaart-kop"><h2>Fitness &amp; vorm · 90 dagen</h2><button class="btn link small" data-preset="Belasting">Meer grafieken →</button></div>
+      <div class="panelen">${paneel({ titel: "Fitness en vermoeidheid", labels: lab, groep: "fit", hoogte: 170, reeksen: [{ naam: "Fitness", waarden: f90.map(x => x.ctl ?? null), kleur: "var(--c-ctl)" }, { naam: "Vermoeidheid", waarden: f90.map(x => x.atl ?? null), kleur: "var(--c-atl)" }],
+        legenda: `<span><i style="border-color:var(--c-ctl)"></i>Fitness (CTL)</span><span><i style="border-color:var(--c-atl)"></i>Vermoeidheid (ATL)</span>` })}
+      ${paneel({ titel: "Vorm (TSB)", sub: "fitness min vermoeidheid", labels: lab, groep: "fit", hoogte: 90, nul: true, reeksen: [{ naam: "Vorm", waarden: f90.map(x => x.vorm ?? null), kleur: "var(--accent)" }] })}
+      ${paneel({ titel: "Trainingsload per dag", labels: lab, groep: "fit", hoogte: 80, reeksen: [{ naam: "Load", type: "staaf", waarden: f90.map(x => x.load || null), kleur: "var(--accent)" }] })}</div>
+    </section>`;
+  // Komende dagen
+  const komend = Array.from({ length: 7 }, (_, i) => plus(dag, i + 1)).map(d => {
+    const t = trainingenOp(d);
+    return `<div class="dagregel" data-pagina="kalender"><div class="wd">${DAG_KORT[wd(d)]}<small>${esc(kort(d))}</small></div><div class="stack" style="gap:4px">
+      ${t.length ? t.map(([, x]) => `<div class="item"><span class="dot" style="background:${sportKleur(x.sport)}"></span>${(x.advies || {}).zone ? `<span class="chip" style="padding:1px 5px">${esc(x.advies.zone)}</span>` : ""}<span>${esc(x.naam)}</span></div>`).join("") : `<span class="small muted">rust</span>`}</div></div>`;
+  }).join("");
+  const komendKaart = `<section class="kaart s4"><div class="kaart-kop"><h2>Komende 7 dagen</h2></div><div class="komend">${komend}</div></section>`;
+  // Deze week
+  const ma = maandagVan(dag);
+  let totG = 0, totD = 0;
+  const weekRijen = Array.from({ length: 7 }, (_, i) => {
+    const d = plus(ma, i), t = trainingenOp(d);
+    const g = t.reduce((s, [, x]) => s + (x.minuten || 0), 0);
+    const gd = t.reduce((s, [, x]) => s + (x.gedaan ? x.gedaan.min || 0 : 0), 0) + extraOp(d).reduce((s, x) => s + (x.min || 0), 0);
+    totG += g; totD += gd; return { d, g, gd };
+  });
+  const maxW = Math.max(60, ...weekRijen.map(w => Math.max(w.g, w.gd)));
+  const weekKaart = `<section class="kaart s6"><div class="kaart-kop"><h2>Deze week · wk ${isoWeek(dag)}</h2><span class="small muted mono">gedaan ${minTekst(totD)} / gepland ${minTekst(totG)}</span></div>
+      <div class="legenda"><span><i class="blok" style="background:var(--soft);outline:1px dashed var(--faint)"></i>Gepland</span><span><i class="blok" style="background:var(--accent)"></i>Gedaan</span></div>
+      <div class="stack" style="gap:7px">${weekRijen.map(w => `<div style="display:grid;grid-template-columns:34px minmax(0,1fr) 92px;gap:10px;align-items:center;font-size:13px">
+        <span class="mono${w.d === dag ? "" : " muted"}" style="${w.d === dag ? "color:var(--accent);font-weight:700" : ""}">${DAG_KORT[wd(w.d)]}</span>
+        <div style="position:relative;height:14px;border-radius:4px;background:var(--surface-2)">
+          ${w.g ? `<div style="position:absolute;inset:0 auto 0 0;width:${w.g / maxW * 100}%;border-radius:4px;background:var(--soft);outline:1px dashed var(--faint);outline-offset:-1px"></div>` : ""}
+          ${w.gd ? `<div style="position:absolute;inset:3px auto 3px 0;width:${w.gd / maxW * 100}%;border-radius:3px;background:var(--accent)"></div>` : ""}</div>
+        <span class="mono small muted" style="text-align:right">${w.gd ? minTekst(w.gd) : "–"} / ${w.g ? minTekst(w.g) : "–"}</span></div>`).join("")}</div></section>`;
+  // Uren per sport
+  const wk = D.weken.slice(-12), sporten = SPORTEN.filter(sp => wk.some(w => w.min[sp]));
+  const sportKaart = `<section class="kaart s6"><div class="kaart-kop"><h2>Uren per week · per sport</h2></div>
+      ${paneel({ titel: "Trainingstijd", labels: wk.map(w => w.start), per: "week", groep: "sport", hoogte: 170, stapel: true, fmt: v => minTekst(v),
+        reeksen: sporten.map(sp => ({ naam: sportNaam(sp), waarden: wk.map(w => w.min[sp] || null), kleur: sportKleur(sp), fmt: minTekst })),
+        legenda: sporten.map(sp => `<span><i class="blok" style="background:${sportKleur(sp)}"></i>${esc(sportNaam(sp))}</span>`).join("") })}</section>`;
+  const z = D.zones || {};
+  const zones = Object.keys(z).length ? `<section class="kaart s12"><div class="kaart-kop"><h2>Hartslagzones</h2><span class="small muted">max ${D.maxHr} bpm · ${esc(D.maxHrBron)}</span></div>
+      <div class="zones">${Object.entries(z).map(([k, [lo, hi]]) => `<div class="zone"><b>${k}</b><span>${lo}–${hi}</span><small>${esc({ UT2: "rustige duur", UT1: "stevige duur", AT: "drempel", TR: "wedstrijd", AN: "sprint" }[k])}</small></div>`).join("")}</div></section>` : "";
+  const verouderd = dag !== vandaag() ? `<div class="melding info">Deze data is van ${esc(mooi(dag))}. De volgende update komt binnen een uur.</div>` : "";
+  return `${verouderd}<div class="kop"><div><h1>Overzicht</h1><div class="sub">${esc(DAG_LANG[wd(dag)])} ${esc(kort(dag))} · week ${isoWeek(dag)} · bijgewerkt ${esc(D.gegenereerd.slice(11, 16))}</div></div></div>
+    <div class="raster">${status}${vandaagKaart}${tegels}${fitness}${komendKaart}${weekKaart}${sportKaart}${zones}</div>`;
+}
+
+function paginaKalender() {
+  const D = S.data, nu = vandaag(), start = S.kalStart, weken = 6;
+  const scores = Object.fromEntries(D.dagen.map(r => [r.d, r.score]));
+  let html = ["ma", "di", "wo", "do", "vr", "za", "zo", "week"].map(d => `<div class="kh">${d}</div>`).join("");
+  for (let w = 0; w < weken; w++) {
+    const ma = plus(start, 7 * w);
+    let g = 0, gd = 0, load = 0, km = 0, sc = [];
+    for (let i = 0; i < 7; i++) {
+      const d = plus(ma, i), t = trainingenOp(d), e = extraOp(d), r = rij(d);
+      t.forEach(([, x]) => { g += x.minuten || 0; if (x.gedaan) { gd += x.gedaan.min || 0; km += x.gedaan.km || 0; } });
+      e.forEach(x => { gd += x.min || 0; km += x.km || 0; });
+      load += r.load || 0; if (scores[d] != null) sc.push(scores[d]);
+      const items = t.map(([id, x]) => {
+        const done = x.gedaan;
+        const meta = done ? [minTekst(done.min), done.km && getal(done.km, 1) + " km", done.load && "load " + done.load].filter(Boolean).join(" · ")
+          : [x.moment, x.minuten && "~" + x.minuten + "′", (x.advies || {}).zone].filter(Boolean).join(" · ");
+        return `<button class="blok ${done ? "gedaan" : "gepland"}" style="--s:${sportKleur(x.sport)}" data-lade="training" data-id="${esc(id)}"><span class="t"><span class="dot"></span>${done ? "✓ " : ""}${esc(x.naam)}</span><span class="m">${esc(meta)}</span></button>`;
+      }).concat(e.map(x => `<button class="blok gedaan" style="--s:${sportKleur(x.sport)}" data-lade="act" data-id="${esc(x.id)}"><span class="t"><span class="dot"></span>${esc(x.naam || sportNaam(x.sport))}</span><span class="m">${esc([x.tijd, minTekst(x.min), x.km && getal(x.km, 1) + " km"].filter(Boolean).join(" · "))}</span></button>`));
+      const dnum = vanIso(d).getDate();
+      html += `<div class="cel${d === nu ? " nu" : ""}${d < nu ? " ander" : ""}${items.length || d === nu ? "" : " leegdag"}"><div class="celkop"><span>${window.innerWidth <= 900 ? esc(mooi(d)) : dnum === 1 || (w === 0 && i === 0) ? esc(kort(d)) : dnum}</span>${scores[d] != null ? `<span class="pil ${niveauVan(scores[d])}" title="Dagscore">${scores[d]}</span>` : ""}</div>${items.join("")}</div>`;
+    }
+    const gem = sc.length ? Math.round(sc.reduce((a, b) => a + b, 0) / sc.length) : null;
+    html += `<div class="wk"><b>Week ${isoWeek(ma)}</b><div class="r"><span>Gepland</span><span>${minTekst(g) }</span></div><div class="r"><span>Gedaan</span><span>${minTekst(gd)}</span></div><div class="r"><span>Load</span><span>${load || "–"}</span></div><div class="r"><span>Afstand</span><span>${km ? getal(km, 0) + " km" : "–"}</span></div><div class="r"><span>Dagscore</span><span>${gem ?? "–"}</span></div></div>`;
+  }
+  return `<div class="kop"><div><h1>Kalender</h1><div class="sub">${esc(kort(start))} – ${esc(kort(plus(start, 7 * weken - 1)))} · stippellijn = gepland, gevuld = gedaan</div></div>
+      <div class="row"><button class="btn" data-actie="kal" data-d="-28" aria-label="Eerder">‹</button><button class="btn" data-actie="kal" data-d="0">Vandaag</button><button class="btn" data-actie="kal" data-d="28" aria-label="Later">›</button></div></div>
+    <div class="kal">${html}</div>
+    <div class="legenda" style="margin-top:12px">${SPORTEN.slice(0, 5).map(sp => `<span><i class="blok" style="background:${sportKleur(sp)}"></i>${esc(sportNaam(sp))}</span>`).join("")}</div>`;
+}
+
+const ACT_KOLOMMEN = [
+  { k: "datum", n: "Datum", w: a => `${kort(a.datum)} <span class="muted">${esc(a.tijd || "")}</span>`, s: a => a.datum + (a.tijd || "") },
+  { k: "sport", n: "Sport", w: a => `<span class="row" style="gap:7px;flex-wrap:nowrap"><span class="dot" style="background:${sportKleur(a.sport)}"></span>${esc(sportNaam(a.sport))}</span>`, s: a => a.sport },
+  { k: "naam", n: "Naam", w: a => esc(a.naam), s: a => a.naam || "" },
+  { k: "min", n: "Duur", n_: true, w: a => minTekst(a.min), s: a => a.min, som: true, fmt: minTekst },
+  { k: "km", n: "Afstand", n_: true, w: a => a.km ? getal(a.km, 1) + " km" : "–", s: a => a.km, som: true, fmt: v => getal(v, 1) + " km" },
+  { k: "tempo", n: "Tempo /500m", n_: true, w: a => ["Rowing", "VirtualRow"].includes(a.sport) ? tempo500(tempoVan(a)) : "–", s: a => ["Rowing", "VirtualRow"].includes(a.sport) ? tempoVan(a) : null },
+  { k: "hr", n: "Gem HR", n_: true, w: a => getal(a.hr), s: a => a.hr, gem: true },
+  { k: "hrMax", n: "Max HR", n_: true, w: a => getal(a.hrMax), s: a => a.hrMax },
+  { k: "cadans", n: "Slag/cad", n_: true, w: a => getal(a.cadans), s: a => a.cadans },
+  { k: "watt", n: "Watt", n_: true, w: a => getal(a.watt), s: a => a.watt },
+  { k: "load", n: "Load", n_: true, w: a => getal(a.load), s: a => a.load, som: true, fmt: v => getal(v) },
+  { k: "intensiteit", n: "Int.", n_: true, w: a => a.intensiteit ? getal(a.intensiteit) + "%" : "–", s: a => a.intensiteit },
+];
+function gefilterdeActs() {
+  const f = S.act, grens = f.periode === "alles" ? "" : plus(vandaag(), -f.periode);
+  const zoek = f.zoek.trim().toLowerCase();
+  const col = ACT_KOLOMMEN.find(c => c.k === f.sort) || ACT_KOLOMMEN[0];
+  return (S.data.activiteiten || []).filter(a => a.datum >= grens && (f.sport === "alle" || a.sport === f.sport) && (!zoek || (a.naam || "").toLowerCase().includes(zoek)))
+    .sort((a, b) => { const x = col.s(a), y = col.s(b); if (x == null) return 1; if (y == null) return -1; return (x > y ? 1 : x < y ? -1 : 0) * f.richting; });
+}
+function paginaActiviteiten() {
+  const f = S.act, lijst = gefilterdeActs();
+  const aanwezig = SPORTEN.filter(sp => (S.data.activiteiten || []).some(a => a.sport === sp));
+  const tot = (k) => lijst.reduce((s, a) => s + (a[k] || 0), 0);
+  const hrs = lijst.filter(a => a.hr);
+  const samenvatting = `<div class="tegels" style="margin-bottom:16px">
+    ${[["Activiteiten", getal(lijst.length)], ["Trainingstijd", minTekst(tot("min"))], ["Afstand", getal(tot("km"), 0) + " km"], ["Load", getal(tot("load"))], ["Gem. hartslag", hrs.length ? getal(hrs.reduce((s, a) => s + a.hr, 0) / hrs.length) + " bpm" : "–"], ["Per week", minTekst(tot("min") / Math.max(1, (f.periode === "alles" ? 365 : f.periode) / 7))]]
+      .map(([n, v]) => `<div class="kaart tegel" style="cursor:default"><span class="label">${n}</span><b style="font-size:26px">${esc(v)}</b></div>`).join("")}</div>`;
+  const kop = ACT_KOLOMMEN.map(c => `<th class="${c.n_ ? "n" : ""}" aria-sort="${f.sort === c.k ? (f.richting > 0 ? "ascending" : "descending") : "none"}"><button data-sort="${c.k}">${esc(c.n)}${f.sort === c.k ? (f.richting > 0 ? " ↑" : " ↓") : ""}</button></th>`).join("");
+  const rijen = lijst.slice(0, 400).map(a => `<tr data-lade="act" data-id="${esc(a.id)}">${ACT_KOLOMMEN.map(c => `<td class="${c.n_ ? "n" : ""}${c.k === "naam" ? " wrap" : ""}">${c.w(a)}</td>`).join("")}</tr>`).join("");
+  const voet = `<tr>${ACT_KOLOMMEN.map((c, i) => `<td class="${c.n_ ? "n" : ""}">${i === 0 ? "Totaal" : c.som ? esc(c.fmt(tot(c.k))) : ""}</td>`).join("")}</tr>`;
+  return `<div class="kop"><div><h1>Activiteiten</h1><div class="sub">Alles wat je horloge heeft opgenomen, via intervals.icu</div></div></div>
+    <div class="filters">
+      <button class="chipknop" data-actfilter="sport" data-v="alle" aria-pressed="${f.sport === "alle"}">Alle</button>
+      ${aanwezig.map(sp => `<button class="chipknop" data-actfilter="sport" data-v="${sp}" aria-pressed="${f.sport === sp}"><span class="dot" style="background:${sportKleur(sp)}"></span>${esc(sportNaam(sp))}</button>`).join("")}
+      <span style="flex:1"></span>
+      <div class="seg" role="group" aria-label="Periode">${[[30, "30 d"], [90, "90 d"], [365, "1 jaar"], ["alles", "Alles"]].map(([v, n]) => `<button data-actfilter="periode" data-v="${v}" aria-pressed="${String(f.periode) === String(v)}">${n}</button>`).join("")}</div>
+      <input type="search" id="actzoek" placeholder="Zoek op naam" value="${esc(f.zoek)}" aria-label="Zoek activiteit">
+    </div>
+    ${samenvatting}
+    <div class="tabelvak"><table><thead><tr>${kop}</tr></thead><tbody>${rijen || `<tr><td colspan="${ACT_KOLOMMEN.length}" class="muted">Geen activiteiten gevonden.</td></tr>`}</tbody><tfoot>${lijst.length ? voet : ""}</tfoot></table></div>
+    ${lijst.length > 400 ? `<p class="small muted">De eerste 400 van ${lijst.length} worden getoond.</p>` : ""}`;
+}
+
+function paginaGrafieken() {
+  const g = S.graf, rijen = S.data.dagen.slice(-g.periode);
+  const labelsDag = rijen.map(r => r.d);
+  const groepen = g.per === "week" ? weekGroepen(rijen) : null;
+  const labels = groepen ? groepen.map(x => x.ma) : labelsDag;
+  const heeftData = m => reeksVoor(m, rijen, "dag", g.sport).some(v => v != null);
+  const kiezer = `<aside class="kaart kiezer">
+      <div class="label" style="margin-bottom:8px">Snel kiezen</div>
+      <div class="row" style="gap:6px;margin-bottom:12px">${Object.keys(PRESETS).map(p => `<button class="btn klein" data-preset="${p}">${p}</button>`).join("")}<button class="btn klein" data-preset="__geen">Leeg</button></div>
+      ${[...new Set(METRICS.map(m => m.g))].map(groep => `<h3>${groep}</h3>${groep === "Training" ? `<div style="margin:2px 0 6px"><select class="ctl" id="grafsport" aria-label="Sport voor trainingsmetrics"><option value="alle">Alle sporten</option>${SPORTEN.map(sp => `<option value="${sp}"${g.sport === sp ? " selected" : ""}>${esc(sportNaam(sp))}</option>`).join("")}</select></div>` : ""}
+        ${METRICS.filter(m => m.g === groep).map(m => { const ok = heeftData(m); return `<label class="vink${ok ? "" : " leeg"}"><input type="checkbox" data-metric-vink="${m.k}"${g.metrics.includes(m.k) ? " checked" : ""}>${esc(m.n)}${ok ? "" : `<span class="geen">geen data</span>`}</label>`; }).join("")}`).join("")}
+    </aside>`;
+  const panelen = g.metrics.map(k => METRIC[k]).filter(Boolean).map(m => {
+    const waarden = reeksVoor(m, rijen, g.per, g.sport);
+    const band = m.band ? { lo: reeksVoor({ k: "hrvLaag" }, rijen, g.per, g.sport), hi: reeksVoor({ k: "hrvHoog" }, rijen, g.per, g.sport) } : null;
+    const sub = [m.act && g.sport !== "alle" ? sportNaam(g.sport) : "", m.uitleg || "", g.per === "week" ? (m.agg === "som" ? "som per week" : "gem. per week") : ""].filter(Boolean).join(" · ");
+    return paneel({ titel: m.n + (m.e && m.e !== "u" ? ` (${m.e})` : ""), sub, labels, per: g.per, groep: "p", hoogte: m.t === "staaf" ? 120 : 140, nul: m.nul, band, max: m.max,
+      fmt: v => fmtMetric(m, v).replace(/ ?(ms|bpm|kg|kcal|km|W|spm|%|\/min|\/500m)$/, ""),
+      reeksen: [{ naam: m.n, waarden, type: m.t === "staaf" ? "staaf" : "lijn", kleur: "var(--accent)", fmt: v => fmtMetric(m, v) }] });
+  }).join("");
+  return `<div class="kop"><div><h1>Grafieken</h1><div class="sub">Vink aan wat je wilt zien. Beweeg over een grafiek om alle waarden van die dag te zien.</div></div>
+      <div class="row"><div class="seg" role="group" aria-label="Periode">${[[30, "30 d"], [90, "90 d"], [180, "6 mnd"], [365, "1 jaar"]].map(([v, n]) => `<button data-graf="periode" data-v="${v}" aria-pressed="${g.periode === v}">${n}</button>`).join("")}</div>
+      <div class="seg" role="group" aria-label="Per">${[["dag", "Per dag"], ["week", "Per week"]].map(([v, n]) => `<button data-graf="per" data-v="${v}" aria-pressed="${g.per === v}">${n}</button>`).join("")}</div></div></div>
+    <div class="grafwerk">${kiezer}<section class="kaart"><div class="panelen">${panelen || `<p class="muted" style="margin:0">Vink links een of meer metrics aan.</p>`}</div></section></div>`;
+}
+
+function paginaSchema() {
+  const pv = S.preview, D = S.data, nu = vandaag();
+  const komend = Object.values(D.trainingen || {}).filter(t => t.datum >= nu).length;
+  const voorbeelden = Object.values(D.trainingen || {}).filter(t => t.voorbeeld).length;
+  const heeftToken = !!opslag.lees("slagboek-gh");
+  const melding = S.melding ? `<div class="melding ${S.melding.soort}">${esc(S.melding.tekst)}</div>` : "";
+  const tabel = pv ? `<div class="stack"><div class="kaart-kop" style="margin:0"><h2>${pv.lijst.length} trainingen gevonden${pv.voorbeeld ? " · voorbeeld" : ""}</h2><span class="small muted">De sport kun je per regel aanpassen.</span></div>
+      <div class="tabelvak"><table><thead><tr><th>Dag</th><th>Sport</th><th>Training</th><th class="n">Min</th></tr></thead><tbody>
+      ${pv.lijst.map((t, i) => `<tr style="cursor:default"><td>${esc(mooi(t.datum))}${t.moment ? `<div class="muted small">${esc(t.moment)}</div>` : ""}</td>
+        <td><select data-pv="${i}" aria-label="Sport">${Object.entries(SPORT_NL).map(([k, v]) => `<option value="${k}"${k === t.sport ? " selected" : ""}>${v}</option>`).join("")}</select></td>
+        <td class="wrap">${esc(t.tekst)}</td><td class="n">${t.minuten ? "~" + t.minuten : "–"}</td></tr>`).join("")}
+      </tbody></table></div>
+      <div class="row"><button class="btn primary" data-actie="opslaan"${S.bezig ? " disabled" : ""}>${S.bezig ? "Bezig met opslaan…" : "Opslaan"}</button><button class="btn" data-actie="annuleer">Annuleren</button></div></div>` : "";
+  return `<div class="kop"><div><h1>Schema</h1><div class="sub">${komend} trainingen gepland vanaf vandaag</div></div></div>
+    ${heeftToken ? "" : `<div class="melding info">Om je schema op te slaan heeft Slagboek eenmalig een GitHub-token nodig. Zie Instellingen.</div>`}
+    <div class="raster">
+      <section class="s7 stack">
+        <label class="drop" id="drop" for="bestand"><strong>Schema van je coach</strong><span class="muted">Sleep het Excel- of CSV-bestand hierheen, of klik om te kiezen.</span><span class="btn">Bestand kiezen</span><input type="file" id="bestand" accept=".xlsx,.xlsm,.xls,.csv" hidden></label>
+        <div class="row">
+          <div class="veld" style="max-width:280px"><label for="startdatum">Maandag van week 1 (alleen als het rooster geen datums heeft)</label><input type="date" id="startdatum" value="${esc(S.start || "")}"></div>
+          <label class="check"><input type="checkbox" id="verleden"${S.verleden ? " checked" : ""}> Ook trainingen van vóór vandaag</label>
+        </div>
+        ${melding}${tabel}
+      </section>
+      <section class="s5 stack">
+        <div class="kaart stack small">
+          <div class="label">Zo werkt het</div>
+          <div>Na opslaan rekent Slagboek alles opnieuw door en zet het schema in je intervals-kalender, en zo op je horloge. Dat duurt 1 à 2 minuten.</div>
+          <div>Een nieuwe versie van hetzelfde schema werkt bestaande trainingen bij. Sessies die je coach heeft geschrapt, verdwijnen.</div>
+          <div class="row">${!pv ? `<button class="btn klein" data-actie="voorbeeld">Probeer een voorbeeldschema</button>` : ""}${voorbeelden ? `<button class="btn klein" data-actie="wis-voorbeelden"${S.bezig ? " disabled" : ""}>Voorbeelden wissen (${voorbeelden})</button>` : ""}</div>
+        </div>
+        <form class="kaart stack" id="instellingen">
+          <div class="label">Instellingen</div>
+          <div class="veld"><label for="gh-repo">GitHub-repository</label><input id="gh-repo" value="${esc(repo())}" placeholder="gebruikersnaam/slagboek"></div>
+          <div class="veld"><label for="gh-token">GitHub-token${heeftToken ? " (ingesteld)" : ""}</label><input id="gh-token" type="password" autocomplete="off" placeholder="${heeftToken ? "•••••••• laat leeg om te houden" : "github_pat_…"}"></div>
+          <span class="small muted">Fine-grained token met alleen deze repository en 'Contents: read and write'. Hij blijft op dit apparaat.</span>
+          <div class="row"><button class="btn" type="submit">Bewaren op dit apparaat</button><button class="btn link" type="button" data-actie="vergrendel">Vergrendelen</button></div>
+        </form>
+      </section>
+    </div>`;
+}
+
+// =====================================================================
+// Detailpaneel
+// =====================================================================
+function ladeHtml() {
+  const L = S.lade; if (!L) return "";
+  let inhoud = "";
+  const statRaster = items => `<div class="stats">${items.filter(([, v]) => v != null && v !== "–").map(([n, v]) => `<div><span>${esc(n)}</span><b>${esc(v)}</b></div>`).join("")}</div>`;
+  const actStats = a => statRaster([["Duur", minTekst(a.min)], ["Afstand", a.km ? getal(a.km, 1) + " km" : null], ["Tempo /500m", ["Rowing", "VirtualRow"].includes(a.sport) && a.km ? tempo500(tempoVan(a)) : null],
+    ["Gem. hartslag", a.hr ? getal(a.hr) : null], ["Max hartslag", a.hrMax ? getal(a.hrMax) : null], ["Load", a.load != null ? getal(a.load) + (a.loadGeschat ? "*" : "") : null],
+    ["Intensiteit", a.intensiteit ? getal(a.intensiteit) + "%" : null], [["Rowing", "VirtualRow"].includes(a.sport) ? "Slagfrequentie" : "Cadans", a.cadans ? getal(a.cadans) : null],
+    ["Vermogen", a.watt ? getal(a.watt) + " W" : null], ["NP", a.np ? getal(a.np) + " W" : null], ["Efficiëntie", a.ef ? getal(a.ef, 2) : null], ["Decoupling", a.decoupling != null ? getal(a.decoupling, 1) + "%" : null],
+    ["Calorieën", a.kcal ? getal(a.kcal) : null], ["RPE", a.rpe ? getal(a.rpe) : null], ["Hoogtemeters", a.hoogte ? getal(a.hoogte) + " m" : null]]);
+  if (L.soort === "training") {
+    const t = (S.data.trainingen || {})[L.id]; if (!t) return "";
+    const adv = t.advies || {}, g = t.gedaan;
+    const act = g && (S.data.activiteiten || []).find(a => a.id === g.id);
+    inhoud = `<div class="row" style="gap:6px"><span class="chip"><span class="dot" style="background:${sportKleur(t.sport)}"></span>${esc(sportNaam(t.sport))}</span>${adv.zone ? `<span class="chip zone">${esc(adv.zone)}</span>` : ""}${g ? `<span class="chip ok">gedaan</span>` : `<span class="chip">gepland</span>`}${t.voorbeeld ? `<span class="chip">voorbeeld</span>` : ""}</div>
+      <h2>${esc(t.naam)}</h2>
+      <div class="muted">${esc(DAG_LANG[wd(t.datum)])} ${esc(kort(t.datum))}${t.moment ? " · " + esc(t.moment) : ""}${t.minuten ? ` · ~${t.minuten} min` : ""}</div>
+      <div class="kaart" style="white-space:pre-wrap;background:var(--surface-2)">${esc(t.tekst)}</div>
+      ${adv.hr ? `<div class="kaart"><div class="label">Hartslag vandaag</div><div style="font:700 34px/1.1 var(--f-display)">${adv.hr[0]}–${adv.hr[1]} <span class="small muted" style="font-family:var(--f-data)">bpm</span></div>${adv.tip ? `<p style="margin:6px 0 0">${esc(adv.tip)}</p>` : ""}</div>` : adv.tip ? `<div class="kaart">${esc(adv.tip)}</div>` : ""}
+      ${act ? `<div class="label">Uitgevoerd</div>${actStats(act)}` : g ? `<div class="label">Uitgevoerd</div>${actStats(g)}` : ""}`;
+  } else {
+    const a = (S.data.activiteiten || []).find(x => x.id === L.id) || (S.data.extra || []).find(x => x.id === L.id); if (!a) return "";
+    const plan = Object.values(S.data.trainingen || {}).find(t => t.gedaan && t.gedaan.id === a.id);
+    inhoud = `<div class="row" style="gap:6px"><span class="chip"><span class="dot" style="background:${sportKleur(a.sport)}"></span>${esc(sportNaam(a.sport))}</span>${plan ? `<span class="chip ok">volgens schema</span>` : ""}</div>
+      <h2>${esc(a.naam || sportNaam(a.sport))}</h2><div class="muted">${esc(DAG_LANG[wd(a.datum)])} ${esc(kort(a.datum))}${a.tijd ? " · " + esc(a.tijd) : ""}</div>
+      ${actStats(a)}
+      ${plan ? `<div class="kaart" style="background:var(--surface-2)"><div class="label">Gepland</div><div style="white-space:pre-wrap">${esc(plan.tekst)}</div></div>` : ""}
+      ${a.loadGeschat ? `<p class="small muted">* Load geschat uit de duur; intervals.icu gaf geen load voor deze activiteit.</p>` : ""}`;
+  }
+  return `<div class="lade-achter" data-actie="sluit-lade"></div><aside class="lade" role="dialog" aria-modal="true" aria-label="Details"><button class="btn klein sluit" data-actie="sluit-lade">Sluiten</button>${inhoud}</aside>`;
+}
+
+// =====================================================================
+// Render
+// =====================================================================
+function render() {
+  if (!S.data) return;
+  GRAF.clear();
+  const d = vandaag();
+  document.getElementById("nav").innerHTML = PAGINAS.map(([k, n, ic]) => `<button data-pagina="${k}"${S.pagina === k ? ' aria-current="page"' : ""}>${icoon(ic)}${n}</button>`).join("");
+  document.getElementById("tabbalk").innerHTML = PAGINAS.map(([k, n, ic]) => `<button data-pagina="${k}"${S.pagina === k ? ' aria-current="page"' : ""}>${icoon(ic)}${n}</button>`).join("");
+  const a = S.data.advies;
+  document.getElementById("zijvoet").innerHTML = `${a ? `<div class="mini-score"><b style="color:var(--${a.niveau})">${a.score}</b><div class="small"><div style="font-weight:600">${esc(a.kop)}</div><div class="muted">dagscore vandaag</div></div></div>` : ""}
+    <div class="small muted">Bijgewerkt ${esc(S.data.gegenereerd.slice(11, 16))}${S.data.gegenereerd.slice(0, 10) !== d ? " op " + esc(kort(S.data.gegenereerd.slice(0, 10))) : ""}</div>`;
+  document.getElementById("topdatum").textContent = `${mooi(d)} · wk ${isoWeek(d)}`;
+  const g = document.getElementById("globaal");
+  g.hidden = !S.wachtOp && !S.fout;
+  g.className = "melding " + (S.fout ? "fout" : "info");
+  g.textContent = S.fout || "Opgeslagen. Slagboek rekent alles opnieuw door; deze pagina ververst vanzelf zodra het klaar is (1–2 minuten).";
+  document.getElementById("pagina").innerHTML = { overzicht: paginaOverzicht, kalender: paginaKalender, activiteiten: paginaActiviteiten, grafieken: paginaGrafieken, schema: paginaSchema }[S.pagina]();
+  document.getElementById("lade-plek").innerHTML = ladeHtml();
+  tekenAlle();
+}
+function naar(pagina) { S.pagina = pagina; opslag.zet("slagboek-pagina", pagina); S.fout = null; render(); window.scrollTo(0, 0); }
+function bewaarGraf() { opslag.zet("slagboek-grafieken", JSON.stringify(S.graf)); }
+
+// =====================================================================
+// Acties
+// =====================================================================
+document.addEventListener("click", async e => {
+  if (!S.data) return;
+  const t = e.target.closest("[data-pagina],[data-actie],[data-lade],[data-metric],[data-preset],[data-graf],[data-actfilter],[data-sort]");
+  if (!t) return;
+  if (t.dataset.lade) { S.lade = { soort: t.dataset.lade, id: t.dataset.id }; document.getElementById("lade-plek").innerHTML = ladeHtml(); document.querySelector(".lade .sluit")?.focus(); return; }
+  if (t.dataset.pagina) return naar(t.dataset.pagina);
+  if (t.dataset.metric) { if (!S.graf.metrics.includes(t.dataset.metric)) S.graf.metrics.unshift(t.dataset.metric); bewaarGraf(); return naar("grafieken"); }
+  if (t.dataset.preset) { S.graf.metrics = t.dataset.preset === "__geen" ? [] : [...PRESETS[t.dataset.preset]]; if (t.dataset.preset === "Ergo") S.graf.sport = "VirtualRow"; bewaarGraf(); return S.pagina === "grafieken" ? render() : naar("grafieken"); }
+  if (t.dataset.graf) { S.graf[t.dataset.graf] = t.dataset.graf === "periode" ? +t.dataset.v : t.dataset.v; bewaarGraf(); return render(); }
+  if (t.dataset.actfilter) { const v = t.dataset.v; S.act[t.dataset.actfilter] = t.dataset.actfilter === "periode" && v !== "alles" ? +v : v; return render(); }
+  if (t.dataset.sort) { const k = t.dataset.sort; S.act.richting = S.act.sort === k ? -S.act.richting : (k === "naam" || k === "sport" ? 1 : -1); S.act.sort = k; return render(); }
+  const a = t.dataset.actie;
+  S.fout = null;
+  if (a === "sluit-lade") { S.lade = null; document.getElementById("lade-plek").innerHTML = ""; }
+  else if (a === "kal") { S.kalStart = +t.dataset.d === 0 ? plus(maandagVan(vandaag()), -14) : plus(S.kalStart, +t.dataset.d); render(); }
+  else if (a === "voorbeeld") laadVoorbeeld();
+  else if (a === "annuleer") { S.preview = null; S.melding = null; render(); }
+  else if (a === "opslaan") opslaan();
+  else if (a === "wis-voorbeelden") {
+    S.bezig = true; render();
+    try {
+      await wijzigInvoer("schema.enc", { trainingen: {} }, d => { for (const [k, v] of Object.entries(d.trainingen)) if (v.voorbeeld) delete d.trainingen[k]; }, "Voorbeeldtrainingen gewist");
+      S.melding = { soort: "ok", tekst: "Voorbeeldtrainingen gewist." }; wachtOpNieuweData();
+    } catch (err) { S.melding = { soort: "fout", tekst: foutTekst(err) }; }
+    S.bezig = false; render();
+  } else if (a === "vergrendel") { opslag.zet("slagboek-sleutel", null); location.reload(); }
+});
+document.addEventListener("keydown", e => { if (e.key === "Escape" && S.lade) { S.lade = null; document.getElementById("lade-plek").innerHTML = ""; } });
+document.addEventListener("input", e => {
+  if (e.target.id === "actzoek") { S.act.zoek = e.target.value; const pos = e.target.selectionStart; render(); const el = document.getElementById("actzoek"); el.focus(); el.setSelectionRange(pos, pos); }
+});
+document.addEventListener("submit", async e => {
+  if (e.target.id === "checkin") {
+    e.preventDefault();
+    const f = new FormData(e.target), gevoel = +f.get("gevoel") || null, spierpijn = +f.get("spierpijn") || null;
+    if (!gevoel && !spierpijn) return;
+    const dag = vandaag();
+    S.bezig = true; render();
+    try {
+      await wijzigInvoer("checkins.enc", { checkins: {} }, d => { d.checkins[dag] = { ...(gevoel && { gevoel }), ...(spierpijn && { spierpijn }) }; }, `Check-in ${dag}`);
+      S.data.checkins = { ...(S.data.checkins || {}), [dag]: { gevoel, spierpijn } };
+      S.bezig = false; wachtOpNieuweData();
+    } catch (err) { S.bezig = false; S.fout = foutTekst(err); render(); }
+  } else if (e.target.id === "instellingen") {
+    e.preventDefault();
+    const r = document.getElementById("gh-repo").value.trim(), tk = document.getElementById("gh-token").value.trim();
+    opslag.zet("slagboek-repo", r || null);
+    if (tk) opslag.zet("slagboek-gh", tk);
+    S.melding = { soort: "ok", tekst: "Instellingen bewaard op dit apparaat." }; render();
+  }
+});
+document.addEventListener("change", e => {
+  const el = e.target;
+  if (el.dataset.metricVink) { const k = el.dataset.metricVink; S.graf.metrics = el.checked ? [...S.graf.metrics.filter(x => x !== k), k] : S.graf.metrics.filter(x => x !== k); bewaarGraf(); render(); }
+  else if (el.id === "grafsport") { S.graf.sport = el.value; bewaarGraf(); render(); }
+  else if (el.id === "bestand" && el.files[0]) leesBestand(el.files[0]);
+  else if (el.id === "startdatum") { S.start = el.value || null; if (S.laatsteBestand) verwerk(S.laatsteBestand); }
+  else if (el.id === "verleden") { S.verleden = el.checked; if (S.laatsteBestand) verwerk(S.laatsteBestand); }
+  else if (el.dataset.pv != null && S.preview) S.preview.lijst[+el.dataset.pv].sport = el.value;
+});
+["dragover", "dragleave", "drop"].forEach(type => document.addEventListener(type, e => {
+  const zone = e.target.closest && e.target.closest("#drop");
+  if (!zone) return;
+  e.preventDefault();
+  zone.classList.toggle("over", type === "dragover");
+  if (type === "drop" && e.dataTransfer.files[0]) leesBestand(e.dataTransfer.files[0]);
+}));
+
+async function leesBestand(file) {
+  if (!window.XLSX) { S.melding = { soort: "fout", tekst: "De Excel-lezer is nog niet geladen. Probeer het over een paar seconden opnieuw." }; return render(); }
+  try {
+    const wb = XLSX.read(await file.arrayBuffer(), { type: "array" });
+    S.laatsteBestand = { naam: file.name, bladen: wb.SheetNames.map(n => XLSX.utils.sheet_to_json(wb.Sheets[n], { header: 1, raw: true, defval: null, blankrows: true })) };
+    verwerk(S.laatsteBestand);
+  } catch (err) { S.preview = null; S.melding = { soort: "fout", tekst: `"${file.name}" kon ik niet openen. Is het een Excel- (.xlsx) of CSV-bestand?` }; render(); }
+}
+function verwerk(bestand, voorbeeld = false) {
+  try {
+    let lijst = leesRijen(bestand.bladen, S.start);
+    const totaal = lijst.length;
+    if (!S.verleden && !voorbeeld) lijst = lijst.filter(t => t.datum >= vandaag());
+    if (!lijst.length) { S.preview = null; S.melding = { soort: "fout", tekst: totaal ? `Alle ${totaal} trainingen in dit bestand liggen in het verleden. Vink "Ook trainingen van vóór vandaag" aan om ze toch op te slaan.` : "Ik vind geen trainingen in dit bestand. Stuur het naar Claude, dan wordt de lezer aangepast op het schema van je coach." }; }
+    else { S.preview = { lijst, voorbeeld }; S.melding = null; }
+  } catch (err) { S.preview = null; S.melding = { soort: "fout", tekst: err.message }; }
+  render();
+}
+function laadVoorbeeld() {
+  const rijen = [
+    [null, "Ma", "Di", "Wo", "Do", "Vr", "Za", "Zo"],
+    ["Ochtend", "Ergo 3x20' UT1 r20/22, 3' rust", "Rust", "Boot 2x6km UT2 r18", "Kracht: squat 5x5, deadlift 4x6", "Skiff 60' UT2", "Wedstrijdtempo 6x500m TR r32+", "Fietsen 1u30 Z2"],
+    ["Middag", null, "Fiets 60' Z2", null, null, "Core + stabi 30 min", null, null],
+  ];
+  const oud = S.start; S.start = maandagVan(vandaag());
+  verwerk({ naam: "voorbeeld", bladen: [rijen] }, true);
+  S.start = oud;
+}
+async function opslaan() {
+  const pv = S.preview; if (!pv) return;
+  S.bezig = true; render();
+  try {
+    const nieuw = new Set(pv.lijst.map(t => t.id)), van = pv.lijst[0].datum, tot = pv.lijst[pv.lijst.length - 1].datum;
+    let gewist = 0;
+    await wijzigInvoer("schema.enc", { trainingen: {} }, d => {
+      for (const [k, t] of Object.entries(d.trainingen)) if (t.datum >= van && t.datum <= tot && !nieuw.has(k) && !t.voorbeeld === !pv.voorbeeld) { delete d.trainingen[k]; gewist++; }
+      for (const t of pv.lijst) {
+        const doc = { datum: t.datum, nr: t.nr, naam: t.naam, tekst: t.tekst, sport: t.sport, moment: t.moment, minuten: t.minuten };
+        if (pv.voorbeeld) doc.voorbeeld = true;
+        for (const k in doc) if (doc[k] == null) delete doc[k];
+        d.trainingen[t.id] = doc;
+      }
+    }, pv.voorbeeld ? "Voorbeeldschema" : `Schema ${van} t/m ${tot}`);
+    S.melding = { soort: "ok", tekst: `${pv.lijst.length} trainingen opgeslagen${gewist ? `, ${gewist} geschrapte sessie(s) verwijderd` : ""}.` };
+    S.preview = null; wachtOpNieuweData();
+  } catch (err) { S.melding = { soort: "fout", tekst: foutTekst(err) }; }
+  S.bezig = false; render();
+}
+
+// =====================================================================
+// Start
+// =====================================================================
+(async () => {
+  const bewaard = opslag.lees("slagboek-sleutel");
+  if (bewaard) {
+    try { await open(bewaard, true); return; } catch (e) { if (e.name === "OperationError") opslag.zet("slagboek-sleutel", null); }
+  }
+  document.getElementById("slot").hidden = false;
+  document.getElementById("sleutel").focus();
+})();
+document.addEventListener("visibilitychange", async () => {
+  if (document.hidden || !S.data) return;
+  try { const d = await laadData(); if (d.gegenereerd !== S.data.gegenereerd) { S.data = d; render(); } } catch (e) {}
+});
+
+</script>
+</body>
+</html>
