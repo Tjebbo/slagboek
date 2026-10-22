@@ -1,0 +1,334 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<meta name="theme-color" content="#0a6a86">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Slagboek">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-180.png">
+<title>Slagboek</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Archivo:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" defer></script>
+<style>
+/* Layout: één smalle app-kolom (telefoon eerst), sticky kop met tabs, statusblok bovenaan Vandaag. */
+:root {
+  --bg: #eef3f5; --surface: #ffffff; --soft: #e2ebef; --ink: #0f1d26; --muted: #56676f; --faint: #8a9aa2; --line: #d3dde2;
+  --accent: #0a6a86; --accent-ink: #ffffff; --band: rgba(10,106,134,.13);
+  --groen: #1d8049; --geel: #a86a12; --rood: #bb342d; --grijs: #6f8089;
+  --f-display: "Barlow Condensed", "Arial Narrow", system-ui, sans-serif;
+  --f-body: "Archivo", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-data: "JetBrains Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+  --r: 10px; color-scheme: light;
+}
+@media (prefers-color-scheme: dark) { :root {
+  --bg: #0c151a; --surface: #13212a; --soft: #1a2c36; --ink: #e5eef2; --muted: #93a6b0; --faint: #627580; --line: #24363f;
+  --accent: #46b6d3; --accent-ink: #052029; --band: rgba(70,182,211,.16);
+  --groen: #4fc283; --geel: #e2a744; --rood: #f06c62; --grijs: #8d9ea7; color-scheme: dark } }
+
+* { box-sizing: border-box }
+html { -webkit-text-size-adjust: 100% }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 var(--f-body); padding-bottom: env(safe-area-inset-bottom, 0px) }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg) }
+[hidden] { display: none !important }
+.wrap { max-width: 680px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)) }
+header.top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--bg); border-bottom: 1px solid var(--line) }
+.brand { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding-block: 14px 8px }
+.brand h1 { font: 700 26px/1 var(--f-display); letter-spacing: .06em; text-transform: uppercase; margin: 0 }
+.brand .datum { font: 500 12px var(--f-data); color: var(--muted); text-transform: uppercase; letter-spacing: .04em; text-align: right }
+nav.tabs { display: flex; gap: 4px; padding-bottom: 10px }
+nav.tabs button { flex: 1; font: 600 14px var(--f-body); padding: 8px 4px; border-radius: 8px; border: 1px solid transparent; background: transparent; color: var(--muted); cursor: pointer }
+nav.tabs button[aria-selected="true"] { background: var(--surface); color: var(--ink); border-color: var(--line) }
+main { padding-block: 18px 56px; display: grid; gap: 22px }
+.stack { display: grid; gap: 14px }
+h2 { font: 700 15px var(--f-display); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin: 0 }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 14px 16px; min-width: 0 }
+.muted { color: var(--muted) } .small { font-size: 13px }
+.mono { font-family: var(--f-data); font-variant-numeric: tabular-nums }
+button, input, select { font: inherit; color: inherit }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 9px 16px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); cursor: pointer; font-weight: 600 }
+.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent) }
+.btn.link { border: 0; background: none; padding: 4px 0; color: var(--accent) }
+.btn:disabled { opacity: .5; cursor: default }
+.row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center }
+.melding { padding: 10px 12px; border-radius: 8px; font-size: 14px }
+.melding.fout { background: color-mix(in srgb, var(--rood) 14%, var(--surface)); border: 1px solid color-mix(in srgb, var(--rood) 40%, var(--line)) }
+.melding.ok { background: color-mix(in srgb, var(--groen) 14%, var(--surface)); border: 1px solid color-mix(in srgb, var(--groen) 40%, var(--line)) }
+.melding.info { background: var(--soft) }
+.veld { display: grid; gap: 4px; min-width: 0 }
+.veld label, .lbl { font-size: 12.5px; font-weight: 600; color: var(--muted) }
+.veld input, .veld select { width: 100%; padding: 9px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg) }
+
+/* Ontgrendelen */
+.slot { max-width: 420px; margin: 12vh auto 0; display: grid; gap: 14px }
+.slot h1 { font: 700 44px/1 var(--f-display); letter-spacing: .06em; text-transform: uppercase; margin: 0 }
+
+/* Status */
+.status { --c: var(--grijs); border-radius: var(--r); padding: 18px; display: grid; gap: 10px; background: color-mix(in srgb, var(--c) 12%, var(--surface)); border: 1px solid color-mix(in srgb, var(--c) 40%, var(--line)) }
+.status.groen { --c: var(--groen) } .status.geel { --c: var(--geel) } .status.rood { --c: var(--rood) }
+.status .boven { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px }
+.status .label { font: 700 30px/1.02 var(--f-display); text-transform: uppercase; letter-spacing: .03em; color: var(--c); text-wrap: balance }
+.status .score { font: 700 54px/.9 var(--f-display); font-variant-numeric: tabular-nums; color: var(--c); text-align: right }
+.status .score small { display: block; font: 500 11px var(--f-data); color: var(--muted); letter-spacing: .04em; margin-top: 4px }
+.status p { margin: 0 }
+.factoren { display: grid; gap: 0; margin-top: 2px }
+.factor { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 12px; padding: 7px 0; border-top: 1px solid color-mix(in srgb, var(--c) 22%, var(--line)); font-size: 14px }
+.factor .w { font: 500 12.5px var(--f-data); color: var(--muted); grid-column: 1 }
+.factor .i { grid-row: 1 / span 2; grid-column: 2; align-self: center; font: 600 11px var(--f-data); text-transform: uppercase; letter-spacing: .05em; padding: 3px 7px; border-radius: 5px }
+.i.goed { color: var(--groen); background: color-mix(in srgb, var(--groen) 14%, var(--surface)) }
+.i.let { color: var(--geel); background: color-mix(in srgb, var(--geel) 14%, var(--surface)) }
+.i.slecht { color: var(--rood); background: color-mix(in srgb, var(--rood) 14%, var(--surface)) }
+
+/* Sessies */
+.sessie { display: grid; gap: 6px }
+.sessie + .sessie { border-top: 1px solid var(--line); padding-top: 12px; margin-top: 12px }
+.sessie .kop { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center }
+.sessie .naam { font-weight: 600; overflow-wrap: anywhere }
+.sessie .tekst { white-space: pre-wrap; color: var(--muted); font-size: 14px; overflow-wrap: anywhere }
+.chip { font: 600 11px var(--f-data); text-transform: uppercase; letter-spacing: .06em; padding: 3px 7px; border-radius: 5px; background: var(--soft) }
+.chip.zone { background: var(--accent); color: var(--accent-ink) }
+.chip.gedaan { background: color-mix(in srgb, var(--groen) 16%, var(--surface)); color: var(--groen) }
+.chip.vb { background: transparent; border: 1px dashed var(--muted); color: var(--muted) }
+.tip { font-size: 14px; padding: 9px 11px; border-radius: 8px; background: var(--soft) }
+.tip b { font-family: var(--f-data); font-weight: 500 }
+.feit { font: 500 12.5px var(--f-data); color: var(--muted); display: flex; flex-wrap: wrap; gap: 4px 12px }
+
+/* Check-in */
+form.checkin { display: grid; gap: 14px }
+.schaal { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px }
+label.pick { position: relative; display: grid; place-items: center; padding: 8px 0; border: 1px solid var(--line); border-radius: 8px; cursor: pointer; font: 500 13px var(--f-data); background: var(--bg) }
+label.pick input { position: absolute; opacity: 0; pointer-events: none }
+label.pick:has(input:checked) { background: var(--accent); color: var(--accent-ink); border-color: var(--accent) }
+label.pick:focus-within { outline: 2px solid var(--accent); outline-offset: 2px }
+.schaal-uitleg { display: flex; justify-content: space-between; font-size: 11.5px; color: var(--muted) }
+
+/* Zones */
+.zones { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px }
+.zone { display: grid; gap: 2px; padding: 8px; border-radius: 8px; background: var(--soft); min-width: 0 }
+.zone b { font: 700 16px var(--f-display); letter-spacing: .05em }
+.zone span { font: 500 12px var(--f-data); font-variant-numeric: tabular-nums }
+.zone small { font-size: 11px; color: var(--muted); overflow-wrap: anywhere }
+
+/* Week */
+.weeknav { display: flex; align-items: center; justify-content: space-between; gap: 10px }
+.weeknav strong { font: 700 20px var(--f-display); letter-spacing: .04em; text-transform: uppercase }
+.dag { display: grid; grid-template-columns: 54px minmax(0, 1fr); gap: 12px; padding-block: 12px; border-top: 1px solid var(--line) }
+.dag:first-child { border-top: 0 }
+.dag .wd { font: 700 18px/1.1 var(--f-display); text-transform: uppercase }
+.dag .wd small { display: block; font: 500 11.5px var(--f-data); color: var(--muted) }
+.dag .wd .sc { display: inline-block; margin-top: 4px; font: 600 11px var(--f-data); padding: 1px 5px; border-radius: 4px }
+.dag.vandaag .wd { color: var(--accent) }
+.dag .leeg { color: var(--muted); font-size: 14px }
+.dag .sessie + .sessie { padding-top: 8px; margin-top: 8px }
+
+/* Trends */
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden }
+.seg button { border: 0; background: var(--surface); padding: 6px 12px; font: 600 13px var(--f-body); cursor: pointer; color: var(--muted) }
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink) }
+.grafiek { position: relative }
+.grafiek .titel { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap }
+.grafiek .titel b { font-weight: 600 }
+.grafiek .nu { font: 500 13px var(--f-data); color: var(--muted) }
+.grafiek svg { display: block; width: 100%; height: auto; overflow: visible; touch-action: pan-y }
+.grafiek svg text { font: 500 10.5px var(--f-data); fill: var(--muted) }
+.legenda { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12.5px; color: var(--muted) }
+.legenda i { display: inline-block; width: 14px; height: 0; border-top: 2px solid; vertical-align: middle; margin-right: 6px }
+.tooltip { position: absolute; pointer-events: none; background: var(--ink); color: var(--bg); font: 500 12px/1.4 var(--f-data); padding: 6px 8px; border-radius: 6px; white-space: nowrap; transform: translate(-50%, -100%); z-index: 2 }
+.tabel { overflow-x: auto }
+table { border-collapse: collapse; width: 100%; font-size: 13.5px }
+th, td { text-align: left; padding: 7px 8px; border-top: 1px solid var(--line); vertical-align: top }
+th { border-top: 0; font: 600 11px var(--f-data); text-transform: uppercase; letter-spacing: .06em; color: var(--muted) }
+td.num { font-family: var(--f-data); font-variant-numeric: tabular-nums; white-space: nowrap }
+td select { padding: 4px 6px; border-radius: 6px; border: 1px solid var(--line); background: var(--bg) }
+
+/* Schema */
+.drop { display: grid; gap: 8px; place-items: center; text-align: center; padding: 26px 16px; border: 1.5px dashed var(--line); border-radius: var(--r); background: var(--surface); cursor: pointer }
+.drop.over { border-color: var(--accent); background: var(--soft) }
+.drop strong { font: 700 20px var(--f-display); letter-spacing: .04em; text-transform: uppercase }
+.check { display: flex; gap: 8px; align-items: center; font-size: 14px }
+@media (max-width: 460px) { .zone { padding: 7px 5px } .zone span { font-size: 11px } .status .label { font-size: 25px } .status .score { font-size: 46px } }
+@media (prefers-reduced-motion: no-preference) { .btn, label.pick, nav.tabs button { transition: background .15s, border-color .15s } }
+</style>
+</head>
+<body>
+
+<div id="slot" class="wrap" hidden>
+  <form class="slot" id="ontgrendel">
+    <h1>Slagboek</h1>
+    <p class="muted" style="margin:0">Je data is versleuteld. Vul je sleutel in (SLAGBOEK_SLEUTEL).</p>
+    <div class="veld"><label for="sleutel">Sleutel</label><input id="sleutel" type="password" autocomplete="current-password" required></div>
+    <label class="check"><input type="checkbox" id="onthoud" checked> Onthouden op dit apparaat</label>
+    <div id="slotfout" class="melding fout" hidden></div>
+    <button class="btn primary" type="submit">Openen</button>
+  </form>
+</div>
+
+<div id="app" hidden>
+  <header class="top">
+    <div class="wrap">
+      <div class="brand"><h1>Slagboek</h1><span class="datum" id="kopdatum"></span></div>
+      <nav class="tabs" role="tablist">
+        <button role="tab" data-tab="vandaag" aria-selected="true">Vandaag</button>
+        <button role="tab" data-tab="week" aria-selected="false">Week</button>
+        <button role="tab" data-tab="trends" aria-selected="false">Trends</button>
+        <button role="tab" data-tab="schema" aria-selected="false">Schema</button>
+      </nav>
+    </div>
+  </header>
+  <main class="wrap">
+    <div id="globaal" class="melding info" hidden></div>
+    <section id="tab-vandaag" class="stack"></section>
+    <section id="tab-week" class="stack" hidden></section>
+    <section id="tab-trends" class="stack" hidden></section>
+    <section id="tab-schema" class="stack" hidden></section>
+  </main>
+</div>
+
+<script>
+"use strict";
+// ---------- datums ----------
+const p2 = n => String(n).padStart(2, "0");
+const iso = d => `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}`;
+const vanIso = s => { const [y, m, d] = s.split("-").map(Number); return new Date(y, m - 1, d); };
+const vandaag = () => iso(new Date());
+const plus = (s, n) => { const d = vanIso(s); d.setDate(d.getDate() + n); return iso(d); };
+const wd = s => (vanIso(s).getDay() + 6) % 7;
+const maandagVan = s => plus(s, -wd(s));
+const dagenTussen = (a, b) => Math.round((vanIso(b) - vanIso(a)) / 864e5);
+const geldig = (y, m, d) => { const dt = new Date(y, m - 1, d); return dt.getFullYear() === y && dt.getMonth() === m - 1 && dt.getDate() === d ? iso(dt) : null; };
+const isoWeek = s => { const d = vanIso(s); d.setDate(d.getDate() + 3 - wd(s)); const j = new Date(d.getFullYear(), 0, 4); return 1 + Math.round(((d - j) / 864e5 - 3 + ((j.getDay() + 6) % 7)) / 7); };
+const DAG_KORT = ["ma", "di", "wo", "do", "vr", "za", "zo"];
+const MAAND_KORT = ["jan", "feb", "mrt", "apr", "mei", "jun", "jul", "aug", "sep", "okt", "nov", "dec"];
+const mooi = s => `${DAG_KORT[wd(s)]} ${vanIso(s).getDate()} ${MAAND_KORT[vanIso(s).getMonth()]}`;
+const kort = s => `${vanIso(s).getDate()} ${MAAND_KORT[vanIso(s).getMonth()]}`;
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const uurMin = u => u == null ? "–" : `${Math.floor(u)}u${p2(Math.round((u % 1) * 60))}`;
+const minTekst = m => m >= 60 ? `${Math.floor(m / 60)}u${p2(m % 60)}` : `${m}′`;
+
+/*PARSER*/
+
+// ---------- versleuteling (gelijk aan slagboek/crypto.py) ----------
+const tekstBytes = s => new TextEncoder().encode(s);
+const b64 = buf => btoa(String.fromCharCode(...new Uint8Array(buf)));
+const unb64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+async function sleutelVan(wachtzin, salt) {
+  const basis = await crypto.subtle.importKey("raw", tekstBytes(wachtzin), "PBKDF2", false, ["deriveKey"]);
+  return crypto.subtle.deriveKey({ name: "PBKDF2", salt, iterations: 200000, hash: "SHA-256" }, basis, { name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]);
+}
+async function ontsleutel(tekst, wachtzin) {
+  const d = JSON.parse(tekst);
+  const sleutel = await sleutelVan(wachtzin, unb64(d.salt));
+  const platte = await crypto.subtle.decrypt({ name: "AES-GCM", iv: unb64(d.iv) }, sleutel, unb64(d.ct));
+  return JSON.parse(new TextDecoder().decode(platte));
+}
+async function versleutel(obj, wachtzin) {
+  const salt = crypto.getRandomValues(new Uint8Array(16)), iv = crypto.getRandomValues(new Uint8Array(12));
+  const sleutel = await sleutelVan(wachtzin, salt);
+  const ct = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, sleutel, tekstBytes(JSON.stringify(obj)));
+  return JSON.stringify({ v: 1, salt: b64(salt), iv: b64(iv), ct: b64(ct) });
+}
+
+// ---------- GitHub als opslag voor schema en check-ins ----------
+const opslag = {
+  lees(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+  zet(k, v) { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch (e) {} },
+};
+function repo() {
+  const eigen = opslag.lees("slagboek-repo");
+  if (eigen) return eigen;
+  const m = location.hostname.match(/^([^.]+)\.github\.io$/);
+  const pad = location.pathname.split("/").filter(Boolean)[0];
+  return m && pad ? `${m[1]}/${pad}` : "";
+}
+async function gh(methode, pad, body) {
+  const token = opslag.lees("slagboek-gh");
+  if (!token) throw new Error("geen-token");
+  const r = await fetch(`https://api.github.com/repos/${repo()}/contents/${pad}`, {
+    method: methode, cache: "no-store",
+    headers: { Authorization: `Bearer ${token}`, Accept: "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28" },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  if (r.status === 404 && methode === "GET") return null;
+  if (r.status === 401 || r.status === 403) throw new Error("token-geweigerd");
+  if (r.status === 409 || r.status === 422) throw new Error("conflict");
+  if (!r.ok) throw new Error("github-" + r.status);
+  return r.json();
+}
+async function leesInvoer(naam, standaard) {
+  const f = await gh("GET", `invoer/${naam}`);
+  if (!f) return { data: standaard, sha: undefined };
+  return { data: await ontsleutel(atob(f.content.replace(/\n/g, "")), S.wachtzin), sha: f.sha };
+}
+async function schrijfInvoer(naam, data, sha, bericht) {
+  const tekst = await versleutel(data, S.wachtzin);
+  await gh("PUT", `invoer/${naam}`, { message: bericht, content: btoa(tekst), sha });
+}
+async function wijzigInvoer(naam, standaard, wijzig, bericht) {
+  for (let poging = 0; poging < 2; poging++) {
+    const { data, sha } = await leesInvoer(naam, standaard);
+    wijzig(data);
+    try { await schrijfInvoer(naam, data, sha, bericht); return data; }
+    catch (e) { if (e.message !== "conflict" || poging) throw e; }
+  }
+}
+function foutTekst(e) {
+  if (e.message === "geen-token") return "Om te kunnen opslaan heeft Slagboek een GitHub-token nodig. Vul hem in onder Schema → Instellingen.";
+  if (e.message === "token-geweigerd") return "GitHub weigert de token. Is hij verlopen, of mist hij 'Contents: read and write' voor deze repository?";
+  if (e.name === "OperationError") return "Ontsleutelen lukte niet: je sleutel klopt niet met die van GitHub Actions.";
+  return "Opslaan lukte niet (" + e.message + "). Controleer je verbinding en probeer het opnieuw.";
+}
+
+// ---------- staat ----------
+const S = { data: null, wachtzin: null, tab: "vandaag", weekStart: maandagVan(vandaag()), bereik: 30, preview: null, melding: null, bezig: false, wachtOp: null, start: null, verleden: false };
+const TABS = ["vandaag", "week", "trends", "schema"];
+{ const t = opslag.lees("slagboek-tab"); if (TABS.includes(t)) S.tab = t; }
+if (TABS.includes(location.hash.slice(1))) S.tab = location.hash.slice(1);
+
+async function laadData() {
+  const r = await fetch(`data.enc?t=${Date.now()}`, { cache: "no-store" });
+  if (r.status === 404) throw new Error("nog-geen-data");
+  if (!r.ok) throw new Error("laden-" + r.status);
+  return ontsleutel(await r.text(), S.wachtzin);
+}
+async function open(wachtzin, onthoud) {
+  S.wachtzin = wachtzin;
+  S.data = await laadData();
+  if (onthoud) opslag.zet("slagboek-sleutel", wachtzin);
+  document.getElementById("slot").hidden = true;
+  document.getElementById("app").hidden = false;
+  render();
+}
+document.getElementById("ontgrendel").addEventListener("submit", async e => {
+  e.preventDefault();
+  const fout = document.getElementById("slotfout");
+  fout.hidden = true;
+  try { await open(document.getElementById("sleutel").value.trim(), document.getElementById("onthoud").checked); }
+  catch (err) {
+    fout.hidden = false;
+    fout.textContent = err.message === "nog-geen-data" ? "Er is nog geen data. Draai de workflow 'slagboek' één keer in GitHub (Actions → Run workflow)."
+      : err.name === "OperationError" ? "Deze sleutel klopt niet. Het is dezelfde als het secret SLAGBOEK_SLEUTEL in GitHub."
+      : "Laden lukte niet. Controleer je verbinding.";
+  }
+});
+
+// Na opslaan: wachten tot GitHub Actions nieuwe data heeft gebouwd.
+async function wachtOpNieuweData() {
+  const oud = S.data.gegenereerd;
+  S.wachtOp = Date.now(); render();
+  while (Date.now() - S.wachtOp < 6 * 60e3) {
+    await new Promise(r => setTimeout(r, 25e3));
+    try { const d = await laadData(); if (d.gegenereerd !== oud) { S.data = d; break; } } catch (e) {}
+  }
+  S.wachtOp = null; render();
+}
+
+/*APP*/
+</script>
+</body>
+</html>
